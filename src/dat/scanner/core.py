@@ -28,6 +28,7 @@ class ScannerOptions:
     safe: bool = False
     deep: bool = False
     max_safe_size: int = 1_000_000
+    max_safe_lines: int = 1_000
     semaphore: asyncio.Semaphore | None = None
     metadata: dict | None = None
 
@@ -74,6 +75,14 @@ class ScanReport:
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
 
+    @property
+    def total_files(self) -> int:
+        return len(self.files)
+
+    @property
+    def total_violations(self) -> int:
+        return sum(len(file.violations) for file in self.files)
+
 
 async def scan_repository(options: ScannerOptions, policy: Policy) -> ScanReport:
     """Scan *options.root* using *policy* and return a report."""
@@ -96,7 +105,12 @@ async def scan_repository(options: ScannerOptions, policy: Policy) -> ScanReport
 
     repo_name = options.root.name
     metadata = options.metadata or {}
-    return ScanReport(repo=repo_name, root=str(options.root), files=sorted(files, key=lambda item: item.path), metadata=metadata)
+    return ScanReport(
+        repo=repo_name,
+        root=str(options.root),
+        files=sorted(files, key=lambda item: item.path),
+        metadata=metadata,
+    )
 
 
 def iter_files(root: Path) -> Iterable[Path]:
@@ -113,9 +127,16 @@ def should_ignore(path: Path, patterns: Sequence[str], root: Path) -> bool:
     return False
 
 
-async def analyse_file(path: Path, options: ScannerOptions, policy: Policy, semaphore: asyncio.Semaphore) -> FileReport | None:
+async def analyse_file(
+    path: Path,
+    options: ScannerOptions,
+    policy: Policy,
+    semaphore: asyncio.Semaphore,
+) -> FileReport | None:
     async with semaphore:
         stat = await asyncio.to_thread(path.stat)
+        if options.safe and not options.deep and (stat.st_mode & 0o444) == 0:
+            return None
         if options.safe and stat.st_size > options.max_safe_size:
             return None
         if not options.deep and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".mp4"}:
@@ -124,17 +145,22 @@ async def analyse_file(path: Path, options: ScannerOptions, policy: Policy, sema
         mime_type = detect_mime_type(path)
         content, encoding = await read_text_preview(path)
         if content is None:
+            if options.safe and not options.deep:
+                return None
             return FileReport(
-                path=str(path),
+                path=str(path.relative_to(options.root)),
                 size=stat.st_size,
                 checksum=checksum,
                 mime_type=mime_type,
                 encoding=encoding or "binary",
                 violations=[],
             )
-        violations = policy.evaluate(path=path, lines=content.splitlines())
+        lines = content.splitlines()
+        if options.safe and not options.deep and len(lines) > options.max_safe_lines:
+            return None
+        violations = policy.evaluate(path=path, lines=lines)
         return FileReport(
-            path=str(path),
+            path=str(path.relative_to(options.root)),
             size=stat.st_size,
             checksum=checksum,
             mime_type=mime_type,
@@ -196,9 +222,40 @@ def build_policy_from_schema(schema_rules: Sequence[dict]) -> Policy:
     return load_default_policy(extra_rules)
 
 
-async def build_scan_report(root: Path, *, ignore: Sequence[str], safe: bool, deep: bool, schema: dict | None) -> ScanReport:
+async def build_scan_report(
+    root: Path,
+    *,
+    ignore: Sequence[str] | None = None,
+    safe: bool = True,
+    deep: bool = False,
+    schema: dict | None = None,
+    max_lines: int = 1_000,
+    max_size: int = 10 * 1024 * 1024,
+) -> ScanReport:
+    if not root.exists():
+        raise FileNotFoundError(root)
     metadata = summarize_metadata(schema)
-    options = ScannerOptions(root=root, ignore_patterns=ignore, safe=safe, deep=deep, metadata=metadata)
+    options = ScannerOptions(
+        root=root,
+        ignore_patterns=tuple(ignore or []),
+        safe=safe,
+        deep=deep,
+        max_safe_lines=max_lines,
+        max_safe_size=max_size,
+        metadata=metadata,
+    )
     schema_rules = extract_rules_from_schema(schema)
     policy = build_policy_from_schema(schema_rules)
     return await scan_repository(options, policy)
+
+
+Violation = RuleViolation
+
+__all__ = [
+    "ScannerOptions",
+    "FileReport",
+    "ScanReport",
+    "Violation",
+    "scan_repository",
+    "build_scan_report",
+]
