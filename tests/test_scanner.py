@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pytest
 
 from dat.scanner.core import (
-    build_scan_report,
-    ScanReport,
     FileReport,
-    Violation
+    ScanReport,
+    Violation,
+    build_scan_report,
 )
-from dat.scanner.scanner import scan_repository, ScanResult
+from dat.scanner.scanner import ScanResult, scan_repository
 
 
 def write_file(path: Path, content: str) -> None:
@@ -160,7 +161,7 @@ class TestAsyncScanner:
         root.mkdir()
         (root / "keep.txt").write_text("hello", encoding="utf-8")
         (root / "skip.log").write_text("world", encoding="utf-8")
-        (root / "subdir" / "also_skip.log").write_text("nested", encoding="utf-8")
+        write_file(root / "subdir" / "also_skip.log", "nested")
         
         report = await _scan(root, ignore=["*.log"])
         files = [entry.path for entry in report.files]
@@ -170,7 +171,7 @@ class TestAsyncScanner:
         
         # Should exclude log files
         assert all("skip.log" not in path for path in files)
-        assert all("also_skip.log" not in path for path for path in files)
+        assert all("also_skip.log" not in path for path in files)
     
     async def test_policy_from_schema(self, tmp_path: Path) -> None:
         """Test custom rule application from schema."""

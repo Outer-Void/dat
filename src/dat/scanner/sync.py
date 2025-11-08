@@ -1,4 +1,4 @@
-"""Repository scanning primitives."""
+"""Synchronous repository scanning utilities."""
 from __future__ import annotations
 
 import fnmatch
@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List
 
-from .utils import is_binary
+from ..utils import is_binary
 
 
 @dataclass
@@ -31,20 +31,35 @@ class ScanStatistics:
 
 
 @dataclass
+class SkipEntry:
+    """Represents a skipped file and the reason it was omitted."""
+
+    path: str
+    reason: str | None = None
+
+
+@dataclass
 class ScanResult:
     """Return value from :func:`scan_repository`."""
 
     root: Path
     files: List[FileRecord] = field(default_factory=list)
-    skipped: List[str] = field(default_factory=list)
+    skipped: List[SkipEntry] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
     stats: ScanStatistics = field(default_factory=ScanStatistics)
 
 
-def should_ignore(path: Path, patterns: Iterable[str]) -> bool:
+def should_ignore(path: Path, patterns: Iterable[str], *, root: Path | None = None) -> bool:
     """Return True when *path* matches any ignore pattern."""
 
-    return any(fnmatch.fnmatch(path.name, pattern) or fnmatch.fnmatch(str(path), pattern) for pattern in patterns)
+    if not patterns:
+        return False
+    relative = str(path.relative_to(root)) if root else path.as_posix()
+    return any(
+        fnmatch.fnmatch(relative, pattern)
+        or fnmatch.fnmatch(path.name, pattern)
+        for pattern in patterns
+    )
 
 
 def count_lines(path: Path, binary: bool, max_lines: int | None) -> int:
@@ -74,19 +89,21 @@ def scan_repository(
 ) -> ScanResult:
     """Walk *root* and capture metadata respecting ignore patterns and thresholds."""
 
+    if not root.exists():
+        raise FileNotFoundError(root)
     result = ScanResult(root=root.resolve())
     ignore_patterns = list(ignore_patterns or [])
 
     for dirpath, dirnames, filenames in os.walk(result.root):
         current = Path(dirpath)
-        # Filter ignored directories
-        dirnames[:] = [d for d in dirnames if not should_ignore(current / d, ignore_patterns)]
 
         for name in filenames:
             file_path = current / name
-            if should_ignore(file_path, ignore_patterns):
+            if should_ignore(file_path, ignore_patterns, root=result.root):
                 result.stats.skipped += 1
-                result.skipped.append(str(file_path.relative_to(result.root)))
+                result.skipped.append(
+                    SkipEntry(str(file_path.relative_to(result.root)), "ignored")
+                )
                 continue
 
             try:
@@ -102,18 +119,24 @@ def scan_repository(
 
             if safe and binary:
                 result.stats.skipped += 1
-                result.skipped.append(str(file_path.relative_to(result.root)))
+                result.skipped.append(
+                    SkipEntry(str(file_path.relative_to(result.root)), "binary")
+                )
                 continue
 
             if safe and size > max_size:
                 result.stats.skipped += 1
-                result.skipped.append(str(file_path.relative_to(result.root)))
+                result.skipped.append(
+                    SkipEntry(str(file_path.relative_to(result.root)), "size")
+                )
                 continue
 
             lines = count_lines(file_path, binary, None if deep else max_lines)
             if safe and not deep and lines > max_lines:
                 result.stats.skipped += 1
-                result.skipped.append(str(file_path.relative_to(result.root)))
+                result.skipped.append(
+                    SkipEntry(str(file_path.relative_to(result.root)), "lines")
+                )
                 continue
 
             record = FileRecord(
@@ -126,6 +149,16 @@ def scan_repository(
             result.stats.scanned += 1
 
     result.files.sort(key=lambda record: record.path)
-    result.skipped.sort()
+    result.skipped.sort(key=lambda entry: entry.path)
     result.errors.sort()
     return result
+
+
+__all__ = [
+    "FileRecord",
+    "ScanStatistics",
+    "SkipEntry",
+    "ScanResult",
+    "scan_repository",
+]
+

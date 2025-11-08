@@ -1,6 +1,6 @@
-"""Convenience exports for scanner APIs."""
+"""Compatibility module exposing synchronous scanner APIs."""
+from __future__ import annotations
 
-from .core import FileReport, ScanReport, Violation, build_scan_report
 from .sync import FileRecord, ScanResult, ScanStatistics, SkipEntry, scan_repository
 
 __all__ = [
@@ -9,9 +9,5 @@ __all__ = [
     "ScanStatistics",
     "SkipEntry",
     "scan_repository",
-    "FileReport",
-    "ScanReport",
-    "Violation",
-    "build_scan_report",
 ]
 

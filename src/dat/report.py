@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import datetime as dt
+import getpass
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
@@ -20,6 +22,8 @@ def build_metadata(root: Path, *, lrc: dict | None = None) -> Dict[str, Any]:
         "dat_version": __version__,
         "generated_at": now.isoformat(),
         "root": str(root),
+        "repo": Path(root).name,
+        "user": getpass.getuser(),
     }
     if lrc:
         metadata["lrc"] = lrc
@@ -46,7 +50,10 @@ def serialise_scan(result: ScanResult) -> Dict[str, Any]:
             }
             for record in result.files
         ],
-        "skipped": result.skipped,
+        "skipped": [
+            {"path": entry.path, "reason": entry.reason}
+            for entry in result.skipped
+        ],
         "errors": result.errors,
     }
 
@@ -65,14 +72,48 @@ def serialise_findings(findings: Iterable[RuleFinding]) -> List[Dict[str, Any]]:
     ]
 
 
+def calculate_report_fingerprint(
+    metadata: Dict[str, Any],
+    scan: Dict[str, Any],
+    findings: List[Dict[str, Any]],
+) -> str:
+    """Create a deterministic fingerprint for a report payload."""
+
+    payload = {
+        "metadata": metadata,
+        "scan": scan,
+        "findings": findings,
+    }
+    digest = hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return f"sha256:{digest}"
+
+
 def write_json_report(path: Path, result: ScanResult, findings: Iterable[RuleFinding], metadata: dict) -> Path:
     """Write a JSON report combining scan results and metadata."""
 
     findings_list = list(findings)
+    serialised_scan = serialise_scan(result)
+    serialised_findings = serialise_findings(findings_list)
+
+    base_metadata = dict(metadata)
+    fingerprint = base_metadata.get("fingerprint")
+    if not fingerprint:
+        trimmed_metadata = dict(base_metadata)
+        trimmed_metadata.pop("fingerprint", None)
+        fingerprint = calculate_report_fingerprint(
+            trimmed_metadata,
+            serialised_scan,
+            serialised_findings,
+        )
+        metadata["fingerprint"] = fingerprint
+        base_metadata["fingerprint"] = fingerprint
+
     report = {
-        "metadata": metadata,
-        "scan": serialise_scan(result),
-        "findings": serialise_findings(findings_list),
+        "metadata": base_metadata,
+        "scan": serialised_scan,
+        "findings": serialised_findings,
     }
     payload = json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8") + b"\n"
     atomic_write(path, payload)
@@ -100,7 +141,7 @@ def write_markdown_report(path: Path, result: ScanResult, findings: Iterable[Rul
         lines.append("")
         lines.append("### Skipped Files")
         for item in result.skipped[:20]:
-            lines.append(f"- {item}")
+            lines.append(f"- {item.path}")
         if len(result.skipped) > 20:
             lines.append(f"- ... {len(result.skipped) - 20} more")
     if findings_list:

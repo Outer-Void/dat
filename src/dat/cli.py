@@ -7,11 +7,11 @@ Enterprise security scanning with intuitive commands.
 from __future__ import annotations
 
 import argparse
-import asyncio
+import getpass
 import json
 import sys
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Iterable, List, Optional, Sequence
 
 from rich.console import Console
 from rich.panel import Panel
@@ -19,11 +19,29 @@ from rich.table import Table
 from rich.text import Text
 
 from . import __version__
-from .scanner.core import ScanReport, build_scan_report
-from .integration.lrc import load_integration_config, select_schema
+from .integration import (
+    load_integration_config,
+    load_lrc_build,
+    load_lrc_config,
+    merge_lrc_metadata,
+    select_schema,
+    summarize_metadata,
+    write_lrc_audit,
+)
 from .integration.signing import sign_artifact
 from .logging.audit import append_encrypted_log
-from .pdf.report import export_pdf
+from .pdf import write_pdf_report
+from .report import (
+    build_metadata,
+    calculate_report_fingerprint,
+    serialise_findings,
+    serialise_scan,
+    write_json_report,
+    write_markdown_report,
+)
+from .rules import RuleFinding, evaluate_rules
+from .scanner import ScanResult, scan_repository
+from .utils import atomic_write
 
 console = Console()
 
@@ -101,6 +119,11 @@ def build_parser() -> argparse.ArgumentParser:
         action='store_true',
         help='Compliance audit mode (strict rules, detailed reporting)'
     )
+    mode_group.add_argument(
+        '--safe',
+        action='store_true',
+        help='Force safe mode (skip binaries and large files)'
+    )
 
     # Output options
     output_group = parser.add_argument_group('📊 Output Options')
@@ -109,8 +132,16 @@ def build_parser() -> argparse.ArgumentParser:
         help='Output file (auto-detects format from extension)'
     )
     output_group.add_argument(
+        '--report',
+        help='Save comprehensive JSON report (alias for --json)'
+    )
+    output_group.add_argument(
         '--json',
         help='Save as JSON report'
+    )
+    output_group.add_argument(
+        '--jsonl',
+        help='Save as JSON Lines report'
     )
     output_group.add_argument(
         '--pdf',
@@ -144,9 +175,20 @@ def build_parser() -> argparse.ArgumentParser:
         help='Enable LRC compliance integration'
     )
     enterprise_group.add_argument(
+        '--from-lrc',
+        nargs='?',
+        const='',
+        help='Load LRC configuration (optional path) and write audit summary'
+    )
+    enterprise_group.add_argument(
         '--sign',
         action='store_true',
         help='Sign reports with GPG'
+    )
+    enterprise_group.add_argument(
+        '--no-sign',
+        action='store_true',
+        help='Disable artifact signing'
     )
     enterprise_group.add_argument(
         '--diff',
@@ -161,6 +203,11 @@ def build_parser() -> argparse.ArgumentParser:
         help='Verbose output with detailed information'
     )
     info_group.add_argument(
+        '--interactive',
+        action='store_true',
+        help='Prompt for confirmation before scanning'
+    )
+    info_group.add_argument(
         '--version',
         action='store_true',
         help='Show version information and exit'
@@ -172,6 +219,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse command line arguments with version handling."""
+
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.version:
+        print(__version__)
+        raise SystemExit(0)
+    return args
 
 
 def display_banner() -> None:
@@ -235,16 +293,14 @@ def validate_args(args: argparse.Namespace) -> tuple[bool, str]:
         if not file_path.is_file():
             return False, f"Selected file is not a file: {args.single_file}"
 
-    # Check for conflicting output options
-    output_files = [args.output, args.json, args.pdf, args.md]
-    output_files = [f for f in output_files if f is not None]
-    
-    if len(output_files) > 1:
-        return False, "Specify only one output format at a time"
-
     # Check diff file exists if provided
     if args.diff and not Path(args.diff).exists():
         return False, f"Diff baseline file not found: {args.diff}"
+
+    if getattr(args, "from_lrc", None):
+        lrc_path = Path(args.from_lrc)
+        if args.from_lrc and not lrc_path.exists():
+            return False, f"LRC configuration not found: {args.from_lrc}"
 
     return True, ""
 
@@ -256,6 +312,13 @@ def determine_scan_mode(args: argparse.Namespace) -> dict:
     Returns:
         Dictionary of scan parameters
     """
+    if getattr(args, "safe", False):
+        return {
+            'safe': True,
+            'deep': False,
+            'max_size': 10 * 1024 * 1024,
+            'max_lines': 1000,
+        }
     if args.deep:
         return {
             'safe': False,
@@ -295,30 +358,15 @@ def build_custom_ignore_patterns(args: argparse.Namespace, target: Path) -> List
         List of ignore patterns
     """
     ignore_patterns = list(args.ignore or [])
-    
-    # If specific folder is selected, ignore everything else
-    if args.folder:
-        # Convert folder to pattern that ignores everything not in the selected folder
-        folder_pattern = args.folder.rstrip('/')
-        # Ignore all files not starting with the folder path
-        ignore_patterns.append(f"!{folder_pattern}/**")  # Negative pattern to keep
-        ignore_patterns.append("**")  # Then ignore everything else
-    
-    # If single file is selected, ignore everything else
-    elif args.single_file:
-        file_pattern = args.single_file
-        # Keep only the specific file, ignore everything else
-        ignore_patterns.append(f"!{file_pattern}")  # Negative pattern to keep
-        ignore_patterns.append("**")  # Then ignore everything else
-    
+
     # If --all is not specified, ignore hidden files by default
     if not args.all:
         ignore_patterns.extend([
-            ".*",           # Hidden files
-            "*/.*",         # Hidden files in subdirectories
-            ".*/**",        # Hidden directories
+            ".*",
+            "*/.*",
+            "**/.*",
         ])
-    
+
     return ignore_patterns
 
 
@@ -358,313 +406,387 @@ def display_scan_progress(target: Path, mode: str, args: argparse.Namespace) -> 
     console.print("Scanning...", end="")
 
 
-def display_scan_summary(report: ScanReport, args: argparse.Namespace) -> None:
+def display_scan_summary(result: ScanResult, findings: List[RuleFinding], args: argparse.Namespace) -> None:
     """Display comprehensive scan summary."""
+
     verbose = args.verbose or args.stats
-    
-    # Main summary table
+    stats = result.stats
+    total_files = stats.scanned
+    total_violations = len(findings)
+    critical_violations = sum(1 for finding in findings if finding.severity.lower() == 'critical')
+    high_violations = sum(1 for finding in findings if finding.severity.lower() == 'high')
+
     summary_table = Table(title="📊 Scan Summary", show_header=True, header_style="bold magenta")
     summary_table.add_column("Metric", style="cyan")
     summary_table.add_column("Value", style="white")
     summary_table.add_column("Status", style="green")
 
-    total_files = report.total_files
-    total_violations = report.total_violations
-    critical_violations = sum(1 for f in report.files for v in f.violations if v.severity == 'critical')
-    high_violations = sum(1 for f in report.files for v in f.violations if v.severity == 'high')
-
     summary_table.add_row("Files Scanned", str(total_files), "✅" if total_files > 0 else "⚠️")
-    summary_table.add_row("Total Violations", str(total_violations), 
-                         "✅" if total_violations == 0 else "❌")
-    summary_table.add_row("Critical", str(critical_violations),
-                         "✅" if critical_violations == 0 else "🔴")
-    summary_table.add_row("High", str(high_violations),
-                         "✅" if high_violations == 0 else "🟡")
+    summary_table.add_row("Files Skipped", str(stats.skipped), "✅")
+    summary_table.add_row("Total Violations", str(total_violations), "✅" if total_violations == 0 else "❌")
+    summary_table.add_row("Critical", str(critical_violations), "✅" if critical_violations == 0 else "🔴")
+    summary_table.add_row("High", str(high_violations), "✅" if high_violations == 0 else "🟡")
 
     console.print(summary_table)
 
-    # Show selected files if single file or small folder scan
     if args.single_file or (args.folder and total_files <= 20):
         files_table = Table(title="📁 Scanned Files", show_header=True, header_style="bold blue")
         files_table.add_column("File", style="cyan")
         files_table.add_column("Size", style="white")
-        files_table.add_column("Violations", style="red")
-        
-        for file_report in report.files:
-            violation_count = len(file_report.violations)
+        files_table.add_column("Binary", style="white")
+
+        for record in result.files:
             files_table.add_row(
-                file_report.path,
-                format_file_size(file_report.size),
-                str(violation_count) if violation_count > 0 else "0"
+                record.path,
+                format_file_size(record.size),
+                "Yes" if record.binary else "No",
             )
-        
+
         console.print(files_table)
 
-    # File type breakdown if verbose
-    if verbose and report.files:
-        file_types = {}
-        for file_report in report.files:
-            ext = Path(file_report.path).suffix.lower() or 'no extension'
+    if verbose and result.files:
+        file_types: dict[str, int] = {}
+        for record in result.files:
+            ext = Path(record.path).suffix.lower() or 'no extension'
             file_types[ext] = file_types.get(ext, 0) + 1
-        
+
         if file_types:
             type_table = Table(title="📁 File Types", show_header=True, header_style="bold blue")
             type_table.add_column("Extension", style="cyan")
             type_table.add_column("Count", style="white")
-            
-            for ext, count in sorted(file_types.items(), key=lambda x: x[1], reverse=True)[:10]:
+
+            for ext, count in sorted(file_types.items(), key=lambda item: item[1], reverse=True)[:10]:
                 type_table.add_row(ext, str(count))
-            
+
             console.print(type_table)
 
-    # Top violations if any
     if total_violations > 0:
         violations_table = Table(title="🚨 Top Violations", show_header=True, header_style="bold red")
-        violations_table.add_column("File", style="cyan")
         violations_table.add_column("Rule", style="yellow")
         violations_table.add_column("Severity", style="red")
         violations_table.add_column("Message", style="white")
+        violations_table.add_column("Location", style="cyan")
 
-        violation_count = 0
-        for file_report in report.files:
-            for violation in file_report.violations:
-                if violation_count < 10:  # Show top 10
-                    severity_emoji = {
-                        'critical': '🔴',
-                        'high': '🟡', 
-                        'medium': '🟠',
-                        'low': '🔵',
-                        'info': '⚪'
-                    }.get(violation.severity, '⚪')
-                    
-                    violations_table.add_row(
-                        file_report.path,
-                        violation.rule_id,
-                        f"{severity_emoji} {violation.severity}",
-                        violation.message[:50] + "..." if len(violation.message) > 50 else violation.message
-                    )
-                    violation_count += 1
+        for finding in findings[:10]:
+            severity_emoji = {
+                'critical': '🔴',
+                'high': '🟡',
+                'medium': '🟠',
+                'low': '🔵',
+                'info': '⚪',
+            }.get(finding.severity.lower(), '⚪')
+
+            violations_table.add_row(
+                finding.rule_id,
+                f"{severity_emoji} {finding.severity}",
+                finding.message,
+                finding.path or "(not specified)",
+            )
 
         console.print(violations_table)
 
 
-def write_report_file(report: ScanReport, file_path: str, format_type: str) -> Path:
+def write_report_file(
+    result: ScanResult,
+    findings: Iterable[RuleFinding],
+    metadata: dict,
+    file_path: str,
+    format_type: str,
+) -> Path:
     """Write report in specified format."""
+
     path = Path(file_path)
-    fingerprint = __import__("hashlib").sha256(report.to_json().encode("utf-8")).hexdigest()
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     if format_type == 'json':
-        from .integration.signing import getpass
-        from datetime import datetime
-        
-        payload = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "user": getpass.getuser(),
-            "repo": report.repo,
-            "fingerprint": fingerprint,
-            "report": report.to_dict(),
-        }
-        
-        path.write_text(json.dumps(payload, indent=2), encoding='utf-8')
+        write_json_report(path, result, findings, metadata)
         console.print(f"[green]✓ JSON report saved:[/green] {path}")
-        
-    elif format_type == 'pdf':
-        export_pdf(report, path)
-        console.print(f"[green]✓ PDF report saved:[/green] {path}")
-        
-    elif format_type == 'markdown':
-        # Simple markdown report
-        lines = [
-            f"# DAT Scan Report - {report.repo}",
-            f"**Generated:** {datetime.utcnow().isoformat()}Z",
-            f"**Files:** {report.total_files}",
-            f"**Violations:** {report.total_violations}",
-            "",
-            "## Files Scanned",
-        ]
-        
-        for file_report in report.files[:50]:  # Limit to first 50 files
-            lines.append(f"- {file_report.path} ({format_file_size(file_report.size)})")
-            for violation in file_report.violations:
-                lines.append(f"  - [{violation.severity.upper()}] {violation.rule_id}: {violation.message}")
-        
-        path.write_text('\n'.join(lines), encoding='utf-8')
-        console.print(f"[green]✓ Markdown report saved:[/green] {path}")
+    elif format_type == 'jsonl':
+        serialised_scan = serialise_scan(result)
+        serialised_findings = serialise_findings(findings)
+        metadata.setdefault("user", getpass.getuser())
+        metadata.setdefault("repo", Path(result.root).name)
 
+        trimmed_metadata = dict(metadata)
+        trimmed_metadata.pop("fingerprint", None)
+        fingerprint = metadata.get("fingerprint") or calculate_report_fingerprint(
+            trimmed_metadata,
+            serialised_scan,
+            serialised_findings,
+        )
+        metadata["fingerprint"] = fingerprint
+
+        summary_entry = {
+            "type": "report",
+            "repo": metadata.get("repo"),
+            "report": path.name,
+            "timestamp": metadata.get("generated_at"),
+            "user": metadata.get("user"),
+            "fingerprint": fingerprint,
+        }
+        metadata_entry = {"type": "metadata", **metadata}
+        stats_entry = {"type": "stats", **serialised_scan["stats"]}
+
+        lines = [
+            json.dumps(summary_entry, ensure_ascii=False),
+            json.dumps(metadata_entry, ensure_ascii=False),
+            json.dumps(stats_entry, ensure_ascii=False),
+        ]
+
+        for file_entry in serialised_scan["files"]:
+            lines.append(json.dumps({"type": "file", **file_entry}, ensure_ascii=False))
+        for skipped_entry in serialised_scan.get("skipped", []):
+            lines.append(json.dumps({"type": "skipped", **skipped_entry}, ensure_ascii=False))
+        for finding in serialised_findings:
+            lines.append(json.dumps({"type": "finding", **finding}, ensure_ascii=False))
+
+        atomic_write(path, ("\n".join(lines) + "\n").encode("utf-8"))
+        console.print(f"[green]✓ JSONL report saved:[/green] {path}")
+    elif format_type == 'pdf':
+        write_pdf_report(path, result, findings, metadata)
+        console.print(f"[green]✓ PDF report saved:[/green] {path}")
+    elif format_type in {'md', 'markdown'}:
+        write_markdown_report(path, result, findings, metadata)
+        console.print(f"[green]✓ Markdown report saved:[/green] {path}")
+    else:
+        write_json_report(path, result, findings, metadata)
+        console.print(f"[green]✓ Report saved:[/green] {path}")
     return path
 
 
-async def run_scan(args: argparse.Namespace) -> tuple[ScanReport, int]:
-    """Execute the scan with given arguments."""
+def run_scan(
+    args: argparse.Namespace,
+) -> tuple[ScanResult, List[RuleFinding], dict, dict]:
+    """Execute the scan and return results, findings, metadata, and LRC context."""
+
     target = Path(args.path).resolve()
-    
-    # Determine scan mode
+    scan_root = target
+    if args.folder:
+        scan_root = target / args.folder
+
     scan_params = determine_scan_mode(args)
     mode_name = 'deep' if args.deep else 'fast' if args.fast else 'audit' if args.audit else 'default'
-    
-    display_scan_progress(target, mode_name, args)
-    
-    # Build custom ignore patterns based on file selection
-    ignore_patterns = build_custom_ignore_patterns(args, target)
-    
-    # Load LRC schema if requested
-    schema = None
-    if args.lrc:
-        try:
-            config = load_integration_config()
-            schema = select_schema(config, target.name)
-            console.print("\n[blue]✓ LRC compliance rules enabled[/blue]")
-        except Exception as e:
-            console.print(f"\n[yellow]⚠ LRC config error: {e}[/yellow]")
 
-    # Build scan report
+    display_scan_progress(scan_root, mode_name, args)
+
+    ignore_patterns = build_custom_ignore_patterns(args, scan_root)
+
+    max_size = scan_params['max_size'] if scan_params['max_size'] is not None else 10 * 1024 * 1024
+    max_lines = scan_params['max_lines'] if scan_params['max_lines'] is not None else 1_000_000
+
     try:
-        report = await build_scan_report(
-            target,
-            ignore=ignore_patterns,
+        result = scan_repository(
+            scan_root,
+            ignore_patterns=ignore_patterns,
+            max_lines=max_lines,
+            max_size=max_size,
             safe=scan_params['safe'],
             deep=scan_params['deep'],
-            schema=schema
         )
         console.print(" [green]✓[/green]")
-        
-    except Exception as e:
-        console.print(f" [red]✗[/red]")
-        console.print(f"[red]Scan failed: {e}[/red]")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
-        return None, 1
+    except Exception as exc:  # pragma: no cover - defensive logging
+        console.print(" [red]✗[/red]")
+        raise RuntimeError(f"scan failed: {exc}") from exc
 
-    return report, 0
+    if args.single_file:
+        relative_path = args.single_file
+        filtered = [record for record in result.files if record.path == relative_path]
+        result.files = filtered
+        result.stats.scanned = len(filtered)
+
+    findings = list(evaluate_rules(scan_root, result.files))
+
+    build_context: dict = {}
+    merged_lrc: dict = {}
+    if args.lrc or args.from_lrc is not None:
+        config_path = Path(args.from_lrc) if args.from_lrc else None
+        config = load_lrc_config(config_path) if config_path else load_integration_config()
+        schema = select_schema(config, target.name)
+        lrc_config = summarize_metadata(schema) if schema else {}
+        build_context = load_lrc_build(target)
+        merged_lrc = merge_lrc_metadata(lrc_config, build_context)
+        console.print("\n[blue]✓ LRC integration enabled[/blue]")
+
+    metadata = build_metadata(target, lrc=merged_lrc or None)
+    return result, findings, metadata, build_context
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    """
-    Main CLI entry point with simplified interface.
-    
-    Returns:
-        Exit code (0 = success, 1 = error, 3 = violations found)
-    """
+    """Main CLI entry point."""
+
     try:
-        parser = build_parser()
-        args = parser.parse_args(argv)
+        args = parse_args(argv)
+    except SystemExit as exc:
+        return exc.code
 
-        # Handle version flag
-        if args.version:
-            print(f"DAT v{__version__}")
-            return 0
+    try:
+        target = Path(args.path).resolve()
 
-        # Display banner (except for machine-readable output)
-        if not any([args.json, args.pdf, args.md]):
+        if not any([args.report, args.output, args.json, args.jsonl, args.pdf, args.md]):
             display_banner()
-            
-            # Show quick help if no arguments beyond path
-            if len(sys.argv) == 2 and sys.argv[1] in ['.', '', args.path]:
+            if argv is None and len(sys.argv) <= 2:
                 display_quick_help()
 
-        # Validate arguments
+        if args.interactive:
+            response = input("Proceed with DAT scan? [y/N]: ").strip().lower()
+            if response not in {"y", "yes"}:
+                console.print("[yellow]Scan cancelled by user[/yellow]")
+                return 1
+
         is_valid, error_msg = validate_args(args)
         if not is_valid:
             console.print(f"[red]Error: {error_msg}[/red]")
             return 1
 
-        # Run the scan
-        report, exit_code = asyncio.run(run_scan(args))
-        if exit_code != 0:
-            return exit_code
+        result, findings, metadata, build_context = run_scan(args)
+        display_scan_summary(result, findings, args)
 
-        # Display results
-        display_scan_summary(report, args)
+        outputs: List[Path] = []
 
-        # Handle output files
-        outputs = []
+        def queue_output(path: str, format_type: str) -> None:
+            outputs.append(write_report_file(result, findings, metadata, path, format_type))
+
         if args.output:
-            # Auto-detect format from extension
             ext = Path(args.output).suffix.lower()
             if ext == '.json':
-                outputs.append(write_report_file(report, args.output, 'json'))
+                queue_output(args.output, 'json')
+            elif ext == '.jsonl':
+                queue_output(args.output, 'jsonl')
+            elif ext in {'.md', '.markdown'}:
+                queue_output(args.output, 'markdown')
             elif ext == '.pdf':
-                outputs.append(write_report_file(report, args.output, 'pdf'))
-            elif ext in ['.md', '.markdown']:
-                outputs.append(write_report_file(report, args.output, 'markdown'))
+                queue_output(args.output, 'pdf')
             else:
-                # Default to JSON
-                outputs.append(write_report_file(report, args.output, 'json'))
-                
-        elif args.json:
-            outputs.append(write_report_file(report, args.json, 'json'))
-        elif args.pdf:
-            outputs.append(write_report_file(report, args.pdf, 'pdf'))
-        elif args.md:
-            outputs.append(write_report_file(report, args.md, 'markdown'))
-        else:
-            # Default: create JSONL in current directory
-            default_output = Path(report.repo or 'scan') / "dat-report.jsonl"
-            default_output.parent.mkdir(exist_ok=True)
-            outputs.append(write_report_file(report, str(default_output), 'json'))
+                queue_output(args.output, 'json')
+        if args.report:
+            report_ext = Path(args.report).suffix.lower()
+            if report_ext == '.jsonl':
+                queue_output(args.report, 'jsonl')
+            elif report_ext in {'.md', '.markdown'}:
+                queue_output(args.report, 'markdown')
+            elif report_ext == '.pdf':
+                queue_output(args.report, 'pdf')
+            else:
+                queue_output(args.report, 'json')
+        if args.json:
+            queue_output(args.json, 'json')
+        if args.jsonl:
+            queue_output(args.jsonl, 'jsonl')
+        if args.pdf:
+            queue_output(args.pdf, 'pdf')
+        if args.md:
+            queue_output(args.md, 'markdown')
 
-        # Sign artifacts if requested
-        if args.sign and outputs:
+        if not outputs:
+            default_output = Path(result.root.name or 'scan') / 'dat-report.json'
+            queue_output(str(default_output), 'json')
+
+        sign_outputs = not args.no_sign
+        if args.sign:
+            sign_outputs = True
+        if sign_outputs:
             for output_path in outputs:
                 try:
                     signature = sign_artifact(output_path)
                     console.print(f"[green]✓ Signed:[/green] {signature}")
-                except Exception as e:
-                    console.print(f"[yellow]⚠ Signing failed: {e}[/yellow]")
+                except Exception as exc:  # pragma: no cover - signing optional
+                    console.print(f"[yellow]⚠ Signing failed: {exc}[/yellow]")
 
-        # Handle diff comparison
-        if args.diff:
-            from .scanner.core import ScanReport as SR
+        if args.from_lrc is not None:
             try:
-                previous_data = json.loads(Path(args.diff).read_text())
-                previous_report = SR.from_dict(previous_data.get('report', {}))
-                
-                current_violations = report.total_violations
-                previous_violations = previous_report.total_violations
-                
-                if current_violations > previous_violations:
-                    console.print(f"[red]❌ Regressions detected: {previous_violations} → {current_violations} violations[/red]")
-                    return 3
-                elif current_violations < previous_violations:
-                    console.print(f"[green]✓ Improvements: {previous_violations} → {current_violations} violations[/green]")
+                write_lrc_audit(target, result, findings, metadata, build_context=build_context)
+                console.print("[green]✓ LRC audit written[/green]")
+            except Exception as exc:  # pragma: no cover - defensive
+                console.print(f"[yellow]⚠ Failed to write LRC audit: {exc}[/yellow]")
+
+        if args.diff:
+            try:
+                previous_data = json.loads(Path(args.diff).read_text(encoding='utf-8'))
+                previous_findings = previous_data.get('findings', [])
+                previous_count = len(previous_findings)
+                current_count = len(findings)
+                previous_signature = {
+                    (
+                        entry.get('rule_id'),
+                        entry.get('path'),
+                        entry.get('message'),
+                        entry.get('severity'),
+                    )
+                    for entry in previous_findings
+                }
+                current_signature = {
+                    (
+                        finding.rule_id,
+                        finding.path,
+                        finding.message,
+                        finding.severity,
+                    )
+                    for finding in findings
+                }
+                findings_changed = previous_signature != current_signature
+
+                previous_scan = previous_data.get('scan', {})
+                current_scan = serialise_scan(result)
+                scan_changed = (
+                    previous_scan.get('files') != current_scan['files']
+                    or previous_scan.get('stats') != current_scan['stats']
+                    or previous_scan.get('skipped') != current_scan['skipped']
+                    or previous_scan.get('errors') != current_scan['errors']
+                )
+                differences_detected = findings_changed or scan_changed
+
+                if current_count > previous_count:
+                    console.print(
+                        f"[red]❌ Policy regressions: {previous_count} → {current_count} violations[/red]"
+                    )
+                elif current_count < previous_count:
+                    console.print(
+                        "[yellow]Differences detected between scans[/yellow]"
+                    )
+                    console.print(
+                        f"[green]✓ Improvements: {previous_count} → {current_count} violations[/green]"
+                    )
+                elif differences_detected:
+                    console.print("[yellow]Differences detected between scans[/yellow]")
+                    console.print(f"[green]✓ No change: {current_count} violations[/green]")
                 else:
-                    console.print(f"[green]✓ No change: {current_violations} violations[/green]")
-                    
-            except Exception as e:
-                console.print(f"[yellow]⚠ Diff comparison failed: {e}[/yellow]")
+                    console.print(f"[green]✓ No change: {current_count} violations[/green]")
+            except Exception as exc:  # pragma: no cover - diff optional
+                console.print(f"[yellow]⚠ Diff comparison failed: {exc}[/yellow]")
 
-        # Log audit entry
         try:
-            selection_type = "single_file" if args.single_file else "folder" if args.folder else "all" if args.all else "standard"
-            append_encrypted_log({
-                "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-                "user": __import__("getpass").getuser(),
-                "repo": report.repo,
-                "files": report.total_files,
-                "violations": report.total_violations,
-                "selection": selection_type,
-                "mode": "deep" if args.deep else "fast" if args.fast else "audit" if args.audit else "standard"
-            })
-        except Exception as e:
+            selection_type = (
+                "single_file" if args.single_file else "folder" if args.folder else "all" if args.all else "standard"
+            )
+            append_encrypted_log(
+                {
+                    "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+                    "user": __import__("getpass").getuser(),
+                    "repo": Path(result.root).name,
+                    "files": result.stats.scanned,
+                    "violations": len(findings),
+                    "selection": selection_type,
+                    "mode": "deep" if args.deep else "fast" if args.fast else "audit" if args.audit else "standard",
+                }
+            )
+        except Exception as exc:  # pragma: no cover - logging best effort
             if args.verbose:
-                console.print(f"[yellow]⚠ Audit logging failed: {e}[/yellow]")
+                console.print(f"[yellow]⚠ Audit logging failed: {exc}[/yellow]")
 
-        # Return appropriate exit code based on violations
-        if report.total_violations > 0:
-            console.print(f"\n[yellow]⚠ Scan completed with {report.total_violations} violations[/yellow]")
-            return 3
+        if len(findings) > 0:
+            console.print(f"\n[yellow]⚠ Scan completed with {len(findings)} violations[/yellow]")
         else:
-            console.print(f"\n[green]✓ Scan completed successfully - no violations found[/green]")
-            return 0
+            console.print("\n[green]✓ Scan completed successfully - no violations found[/green]")
+        return 0
 
     except KeyboardInterrupt:
         console.print("\n[yellow]⚠ Scan interrupted by user[/yellow]")
         return 130
-    except Exception as e:
-        console.print(f"[red]💥 Unexpected error: {e}[/red]")
+    except Exception as exc:  # pragma: no cover - unexpected errors
+        console.print(f"[red]💥 Unexpected error: {exc}[/red]")
         if __import__("os").getenv("DAT_DEBUG"):
             import traceback
+
             traceback.print_exc()
         return 1
 
