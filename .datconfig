@@ -1,0 +1,20 @@
+# .datconfig (optional – if your CLI loads it)
+scan:
+  ignore:
+    - .git/
+    - .venv/
+    - __pycache__/
+    - node_modules/
+    - build/
+    - dist/
+    - *.pyc
+    - *.pyo
+    - src/dat.egg-info/
+    - artifacts/
+output:
+  include_snippets: true
+  context_lines: full
+  mask_secrets: true
+  relative_paths: true
+  format: md
+  out: artifacts/report.md

@@ -1,4 +1,5 @@
 """Artifact signing helpers."""
+
 from __future__ import annotations
 
 import hashlib
@@ -74,4 +75,3 @@ def verify_signature(path: Path, signature_path: Path) -> bool:
 
 
 __all__ = ["SigningError", "sign_artifact", "verify_signature"]
-

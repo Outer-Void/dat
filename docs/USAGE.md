@@ -438,7 +438,7 @@ Option Description Default
 DAT ENTERPRISE SECURITY SCAN
 ============================
 Scan Date: 2024-01-15 14:30:22 UTC
-Repository: production-service (v2.1.0)
+Repository: production-service (v3.0.0)
 Scanner: DAT v3.0.0-alpha.1
 
 SUMMARY

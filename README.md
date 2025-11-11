@@ -1,4 +1,4 @@
-![DAT Logo](docs/assets/dat-logo-green.png)
+![DAT Logo](docs/assets/dat-logo-space-main.png)
 
 # Dev Audit Tool [DAT]
 

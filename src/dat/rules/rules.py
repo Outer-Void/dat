@@ -1,9 +1,11 @@
 """Policy evaluation helpers for DAT."""
+
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Protocol
+from typing import Protocol
 
 
 class FileRecordLike(Protocol):
@@ -28,7 +30,9 @@ DEFAULT_RULES = (
     ("credentials.password", "Potential password in source", "critical"),
 )
 
-RULE_LOOKUP = {rule_id: (message, severity) for rule_id, message, severity in DEFAULT_RULES}
+RULE_LOOKUP = {
+    rule_id: (message, severity) for rule_id, message, severity in DEFAULT_RULES
+}
 
 RULE_PATTERNS = {
     "no.todo": ["TODO"],
@@ -38,10 +42,10 @@ RULE_PATTERNS = {
 }
 
 
-def evaluate_rules(root: Path, files: Iterable[FileRecordLike]) -> List[RuleFinding]:
+def evaluate_rules(root: Path, files: Iterable[FileRecordLike]) -> list[RuleFinding]:
     """Evaluate :data:`DEFAULT_RULES` against scanned *files* within *root*."""
 
-    findings: List[RuleFinding] = []
+    findings: list[RuleFinding] = []
     for record in files:
         if record.binary:
             continue
@@ -58,5 +62,4 @@ def evaluate_rules(root: Path, files: Iterable[FileRecordLike]) -> List[RuleFind
     return findings
 
 
-__all__ = ["RuleFinding", "DEFAULT_RULES", "RULE_LOOKUP", "evaluate_rules"]
-
+__all__ = ["DEFAULT_RULES", "RULE_LOOKUP", "RuleFinding", "evaluate_rules"]

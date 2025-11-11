@@ -1,13 +1,16 @@
 """Integration helpers for LRC generated metadata."""
+
 from __future__ import annotations
 
 import json
 import os
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any
 
 from ..utils import merge_dicts
+
 
 DEFAULT_LRC_CONFIG_PATH = Path.home() / ".config" / "lrc" / "dat_integration.json"
 LRC_CONFIG_PATH = DEFAULT_LRC_CONFIG_PATH
@@ -17,7 +20,7 @@ class LRCIntegrationError(RuntimeError):
     """Raised when LRC integration fails."""
 
 
-def _default_config() -> Dict[str, Any]:
+def _default_config() -> dict[str, Any]:
     return {"schemas": []}
 
 
@@ -30,7 +33,7 @@ def resolve_lrc_config_path(path: Path | None = None) -> Path:
     return DEFAULT_LRC_CONFIG_PATH
 
 
-def load_integration_config(path: Path | None = None) -> Dict[str, Any]:
+def load_integration_config(path: Path | None = None) -> dict[str, Any]:
     """Load the LRC integration configuration file.
 
     The loader is intentionally forgiving – missing or malformed configuration
@@ -54,7 +57,9 @@ def load_integration_config(path: Path | None = None) -> Dict[str, Any]:
     return config
 
 
-def select_schema(config: Dict[str, Any], repo_name: str | None) -> Dict[str, Any] | None:
+def select_schema(
+    config: dict[str, Any], repo_name: str | None
+) -> dict[str, Any] | None:
     """Select the schema entry matching *repo_name*.
 
     Schema ``repos`` entries can contain exact names, glob-style patterns or
@@ -62,10 +67,10 @@ def select_schema(config: Dict[str, Any], repo_name: str | None) -> Dict[str, An
     fallback is the first schema without any ``repos`` definition.
     """
 
-    schemas: Iterable[Dict[str, Any]] = config.get("schemas", [])  # type: ignore[assignment]
+    schemas: Iterable[dict[str, Any]] = config.get("schemas", [])  # type: ignore[assignment]
     default_schema = None
     for schema in schemas:
-        targets: List[str] = schema.get("repos", [])  # type: ignore[assignment]
+        targets: list[str] = schema.get("repos", [])  # type: ignore[assignment]
         if not targets:
             default_schema = default_schema or schema
             continue
@@ -82,7 +87,7 @@ def select_schema(config: Dict[str, Any], repo_name: str | None) -> Dict[str, An
     return default_schema
 
 
-def extract_rules_from_schema(schema: Dict[str, Any] | None) -> List[Dict[str, Any]]:
+def extract_rules_from_schema(schema: dict[str, Any] | None) -> list[dict[str, Any]]:
     """Return policy rules defined inside *schema*."""
 
     if not schema:
@@ -90,7 +95,7 @@ def extract_rules_from_schema(schema: Dict[str, Any] | None) -> List[Dict[str, A
     rules = schema.get("rules")
     if not isinstance(rules, list):
         return []
-    extracted: List[Dict[str, Any]] = []
+    extracted: list[dict[str, Any]] = []
     for rule in rules:
         if not isinstance(rule, dict):
             continue
@@ -100,7 +105,7 @@ def extract_rules_from_schema(schema: Dict[str, Any] | None) -> List[Dict[str, A
     return extracted
 
 
-def summarize_metadata(schema: Dict[str, Any] | None) -> Dict[str, Any]:
+def summarize_metadata(schema: dict[str, Any] | None) -> dict[str, Any]:
     """Return the metadata subset relevant for audit reports."""
 
     if not schema:
@@ -109,7 +114,9 @@ def summarize_metadata(schema: Dict[str, Any] | None) -> Dict[str, Any]:
     return {key: value for key, value in schema.items() if key in allowed_keys}
 
 
-def merge_lrc_metadata(config_metadata: Dict[str, Any], build_metadata: Dict[str, Any]) -> Dict[str, Any]:
+def merge_lrc_metadata(
+    config_metadata: dict[str, Any], build_metadata: dict[str, Any]
+) -> dict[str, Any]:
     """Deep merge config and build metadata with build values taking precedence."""
 
     return merge_dicts(config_metadata, build_metadata)
@@ -117,10 +124,9 @@ def merge_lrc_metadata(config_metadata: Dict[str, Any], build_metadata: Dict[str
 
 __all__ = [
     "LRCIntegrationError",
-    "load_integration_config",
-    "select_schema",
     "extract_rules_from_schema",
-    "summarize_metadata",
+    "load_integration_config",
     "merge_lrc_metadata",
+    "select_schema",
+    "summarize_metadata",
 ]
-

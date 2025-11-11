@@ -1,3 +1,25 @@
+#!/usr/bin/env bash
+# Emergency fix for corrupted pyproject.toml
+
+set -euo pipefail
+
+echo "🚨 Emergency pyproject.toml fix..."
+echo
+
+# Backup current (corrupted) file
+if [ -f "pyproject.toml" ]; then
+    cp pyproject.toml pyproject.toml.corrupted
+    echo "✓ Backed up corrupted file to pyproject.toml.corrupted"
+fi
+
+# Check if we have a backup
+if [ -f "pyproject.toml.bak" ]; then
+    echo "✓ Found backup: pyproject.toml.bak"
+    cp pyproject.toml.bak pyproject.toml.original
+fi
+
+# Create a clean, working pyproject.toml
+cat > pyproject.toml << 'TOML_EOF'
 [project]
 name = "outervoid-dat"
 version = "3.0.0"
@@ -177,3 +199,42 @@ module = [
     "typer.*",
 ]
 ignore_missing_imports = true
+TOML_EOF
+
+echo "✓ Created clean pyproject.toml"
+echo
+
+# Validate the file
+echo "→ Validating TOML syntax..."
+python3 << 'EOF'
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        print("⚠ Cannot validate (tomli not installed)")
+        exit(0)
+
+from pathlib import Path
+
+try:
+    data = tomllib.loads(Path("pyproject.toml").read_text())
+    print("✓ TOML syntax is valid!")
+    print(f"  Package: {data['project']['name']}")
+    print(f"  Version: {data['project']['version']}")
+except Exception as e:
+    print(f"❌ TOML validation failed: {e}")
+    exit(1)
+EOF
+
+echo
+echo "✅ pyproject.toml fixed!"
+echo
+echo "Files created:"
+echo "  pyproject.toml           - Clean, working version"
+echo "  pyproject.toml.corrupted - Backup of corrupted file"
+echo "  pyproject.toml.original  - Original backup (if existed)"
+echo
+echo "Next: Run ruff to verify:"
+echo "  ruff check . --statistics"

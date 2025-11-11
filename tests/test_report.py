@@ -17,10 +17,12 @@ def test_write_json_report(tmp_path):
     metadata = build_metadata(tmp_path)
     output = tmp_path / "audit.json"
 
-    write_json_report(output, result, [RuleFinding("id", "message", "low", "a.txt")], metadata)
+    write_json_report(
+        output, result, [RuleFinding("id", "message", "low", "a.txt")], metadata
+    )
 
     data = output.read_text(encoding="utf-8")
-    assert "\n" == data[-1]
+    assert data[-1] == "\n"
     assert "audit.json" in str(output)
 
 

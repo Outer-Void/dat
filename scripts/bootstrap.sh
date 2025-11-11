@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail; IFS=$'\n\t'
 # ───────────────────────────────────────────────────────────────────────────────
 #  Dev Audit Tool (dat) - Bootstrap Script v1.0.0
 #  Author: ~JADIS | Justadudeinspace  

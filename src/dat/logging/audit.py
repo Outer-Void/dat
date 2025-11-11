@@ -1,10 +1,12 @@
 """Encrypted audit logging."""
+
 from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any
 
 from cryptography.fernet import Fernet
 
@@ -33,9 +35,9 @@ def _ensure_key() -> bytes:
     return key
 
 
-def _decrypt_entries(data: Iterable[bytes], key: bytes) -> List[Dict[str, Any]]:
+def _decrypt_entries(data: Iterable[bytes], key: bytes) -> list[dict[str, Any]]:
     fernet = Fernet(key)
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     for raw in data:
         line = raw.strip()
         if not line:
@@ -48,7 +50,7 @@ def _decrypt_entries(data: Iterable[bytes], key: bytes) -> List[Dict[str, Any]]:
     return entries
 
 
-def _write_entries(entries: Iterable[Dict[str, Any]], key: bytes) -> None:
+def _write_entries(entries: Iterable[dict[str, Any]], key: bytes) -> None:
     log_path = log_file()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     fernet = Fernet(key)
@@ -58,7 +60,7 @@ def _write_entries(entries: Iterable[Dict[str, Any]], key: bytes) -> None:
             handle.write(token + b"\n")
 
 
-def append_encrypted_log(payload: Dict[str, Any]) -> None:
+def append_encrypted_log(payload: dict[str, Any]) -> None:
     """Encrypt and persist *payload* into the audit log."""
 
     key = _ensure_key()
@@ -69,7 +71,7 @@ def append_encrypted_log(payload: Dict[str, Any]) -> None:
         handle.write(token + b"\n")
 
 
-def read_audit_log() -> List[Dict[str, Any]]:
+def read_audit_log() -> list[dict[str, Any]]:
     """Return decrypted audit log entries."""
 
     log_path = log_file()
@@ -90,7 +92,7 @@ def rotate_audit_key() -> None:
         return
     old_key = key_path.read_bytes()
     log_path = log_file()
-    existing: List[Dict[str, Any]] = []
+    existing: list[dict[str, Any]] = []
     if log_path.exists():
         with log_path.open("rb") as handle:
             existing = _decrypt_entries(handle, old_key)
@@ -103,7 +105,7 @@ def rotate_audit_key() -> None:
         log_path.write_text("", encoding="utf-8")
 
 
-def log_system_event(event: str, payload: Dict[str, Any]) -> None:
+def log_system_event(event: str, payload: dict[str, Any]) -> None:
     """Helper used during package initialisation to record system events."""
 
     entry = dict(payload)
@@ -120,4 +122,3 @@ __all__ = [
     "read_audit_log",
     "rotate_audit_key",
 ]
-

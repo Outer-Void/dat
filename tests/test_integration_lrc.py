@@ -26,7 +26,9 @@ def test_merge_lrc_metadata():
 def test_write_lrc_audit(tmp_path):
     result = sample_result(tmp_path)
     metadata = {"dat_version": "3", "generated_at": "now"}
-    output = integration.write_lrc_audit(tmp_path, result, [RuleFinding("id", "msg", "low", None)], metadata)
+    output = integration.write_lrc_audit(
+        tmp_path, result, [RuleFinding("id", "msg", "low", None)], metadata
+    )
 
     assert output.exists()
     data = output.read_text(encoding="utf-8")

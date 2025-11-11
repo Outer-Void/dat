@@ -1,21 +1,41 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-DAT (Dev Audit Tool) - Simplified CLI Entry Point
-Enterprise-grade security scanning made simple.
+DAT (Dev Audit Tool) — CLI entry
+- Works when package is installed (prefers site-packages import)
+- Falls back to local ./src for editable dev
 """
 
 from __future__ import annotations
-
 import os
 import sys
 from pathlib import Path
 
-# Add src to path for development
-SRC = Path(__file__).resolve().parent / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+MIN_PY = (3, 8)
+if sys.version_info < MIN_PY:
+    raise SystemExit(f"DAT requires Python {MIN_PY[0]}.{MIN_PY[1]}+ (found {sys.version.split()[0]})")
 
-from dat.cli import main
+def _resolve_main():
+    # Prefer the installed package
+    try:
+        from dat.cli import main  # type: ignore
+        return main
+    except Exception:
+        # Dev fallback: add ./src only if present and allowed
+        if os.environ.get("DAT_NO_DEVPATH") == "1":
+            raise
+        repo_root = Path(__file__).resolve().parent
+        src = repo_root / "src"
+        if src.is_dir():
+            sys.path.insert(0, str(src))
+            from dat.cli import main  # type: ignore
+            return main
+        # If we get here, neither site-packages nor ./src worked
+        raise
 
 if __name__ == "__main__":
+    try:
+        main = _resolve_main()
+    except Exception as e:
+        raise SystemExit(f"Failed to load DAT CLI: {e}")
     raise SystemExit(main())

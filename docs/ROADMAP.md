@@ -217,4 +217,4 @@
 *This roadmap represents our vision for DAT's evolution from a security scanning tool to a comprehensive security intelligence platform. We welcome community feedback and contributions to help shape this journey.*
 
 **Last Updated**: 2024-05-25  
-**Next Major Release**: v3.1.0 - Enhanced Analytics (Q3 2024)
+**Next Major Release**: v3.0.0 - Enhanced Analytics (Q3 2024)

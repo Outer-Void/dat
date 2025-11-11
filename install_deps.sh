@@ -10,18 +10,17 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Logging functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-log_debug() { echo -e "${CYAN}[DEBUG]${NC} $1"; }
+# Logging functions (all to stderr)
+log_info() { echo -e "${BLUE}[INFO]${NC} $1" >&2; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1" >&2; }
+log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1" >&2; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 
 # Print banner
 print_banner() {
     echo -e "${CYAN}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║                   DAT Installer v3.0.0-alpha.1               ║"
+    echo "║                   DAT Installer v3.0.0                       ║"
     echo "║         Enterprise Security Scanning Tool                    ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -39,374 +38,305 @@ check_root() {
     fi
 }
 
-# Detect Python with version checking
+# Robust Python detection
 detect_python() {
-    local python_cmd=""
+    log_info "Detecting Python..."
     
-    # Try python3 first
-    if command -v python3 >/dev/null 2>&1; then
-        python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')" 2>/dev/null || echo "unknown")
-        if python3 -c "import sys; sys.exit(0) if sys.version_info >= (3, 8) else sys.exit(1)" 2>/dev/null; then
-            python_cmd="python3"
-            log_success "Found Python 3: $python_version"
-        else
-            log_error "Python 3.8+ required, found $python_version"
-            return 1
+    # Try different Python commands in order of preference
+    for py_cmd in python3.11 python3.10 python3.9 python3.8 python3 python; do
+        if command -v "$py_cmd" >/dev/null 2>&1; then
+            # Check Python version
+            version=$("$py_cmd" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
+            
+            # Extract major and minor version
+            major=$(echo "$version" | cut -d. -f1)
+            minor=$(echo "$version" | cut -d. -f2)
+            
+            if [[ $major -eq 3 ]] && [[ $minor -ge 8 ]]; then
+                log_success "Found Python $version using $py_cmd"
+                printf '%s\n' "$py_cmd"
+                return 0
+            else
+                log_warning "Python $version found but 3.8+ required"
+            fi
         fi
-    # Fall back to python
-    elif command -v python >/dev/null 2>&1; then
-        python_version=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')" 2>/dev/null || echo "unknown")
-        if python -c "import sys; sys.exit(0) if sys.version_info >= (3, 8) else sys.exit(1)" 2>/dev/null; then
-            python_cmd="python"
-            log_success "Found Python 3: $python_version"
-        else
-            log_error "Python 3.8+ required, found $python_version"
-            return 1
-        fi
-    else
-        log_error "Python 3.8+ is not installed"
-        log_info "Download from: https://python.org/downloads/"
-        return 1
-    fi
+    done
     
-    echo "$python_cmd"
+    log_error "No suitable Python 3.8+ installation found"
+    log_info "Please install Python 3.8 or newer from: https://python.org/downloads/"
+    return 1
 }
 
-# Install Python dependencies
-install_python_deps() {
+# Install DAT package
+install_dat_package() {
     local python_cmd="$1"
-    log_info "Installing Python dependencies..."
+    local install_mode="$2"
     
-    # Upgrade pip first
-    log_info "Upgrading pip..."
-    $python_cmd -m pip install --upgrade pip --quiet
+    log_info "Installing DAT package ($install_mode)..."
     
-    if [[ -f "requirements.txt" ]]; then
-        log_info "Installing from requirements.txt..."
-        if $python_cmd -m pip install -r requirements.txt --quiet; then
-            log_success "Python dependencies installed from requirements.txt"
-        else
-            log_error "Failed to install from requirements.txt"
-            return 1
-        fi
-    else
-        log_warning "requirements.txt not found, installing core dependencies..."
-        local core_deps=(
-            "rich>=13.0.0"
-            "cryptography>=41.0.0"
-            "reportlab>=4.0.0"
-            "python-magic>=0.4.27"
-            "Pillow>=10.0.0"
-            "colorama>=0.4.6"
-        )
-        
-        if $python_cmd -m pip install "${core_deps[@]}" --quiet; then
-            log_success "Core Python dependencies installed"
-        else
-            log_error "Failed to install core dependencies"
-            return 1
-        fi
-    fi
+    case "$install_mode" in
+        "dev")
+            # Development mode - install from current directory
+            if [[ -f "pyproject.toml" ]]; then
+                log_info "Installing in development mode from pyproject.toml"
+                if "$python_cmd" -m pip install -e .[dev]; then
+                    log_success "DAT installed in development mode"
+                else
+                    log_error "Failed to install DAT in development mode"
+                    return 1
+                fi
+            else
+                log_error "pyproject.toml not found - cannot install in development mode"
+                return 1
+            fi
+            ;;
+        "prod")
+            # Production mode - install from current directory
+            if [[ -f "pyproject.toml" ]]; then
+                log_info "Installing in production mode from pyproject.toml"
+                if "$python_cmd" -m pip install .; then
+                    log_success "DAT installed in production mode"
+                else
+                    log_error "Failed to install DAT in production mode"
+                    return 1
+                fi
+            elif [[ -f "requirements.txt" ]]; then
+                log_info "Installing from requirements.txt"
+                if "$python_cmd" -m pip install -r requirements.txt; then
+                    log_success "DAT installed from requirements.txt"
+                else
+                    log_error "Failed to install from requirements.txt"
+                    return 1
+                fi
+            else
+                log_error "No installation files found (pyproject.toml or requirements.txt)"
+                return 1
+            fi
+            ;;
+        "pypi")
+            # Install from PyPI
+            log_info "Installing from PyPI..."
+            if "$python_cmd" -m pip install outervoid-dat; then
+                log_success "DAT installed from PyPI"
+            else
+                log_error "Failed to install from PyPI"
+                log_info "Trying with --user flag..."
+                if "$python_cmd" -m pip install --user outervoid-dat; then
+                    log_success "DAT installed from PyPI with --user flag"
+                else
+                    return 1
+                fi
+            fi
+            ;;
+    esac
+    
+    return 0
 }
 
-# Detect platform and install system dependencies
+# Install system dependencies
 install_system_deps() {
     local os=$(uname -s | tr '[:upper:]' '[:lower:]')
-    local platform_specific=0
     
     log_info "Detected platform: $os"
     
     case "$os" in
         linux*)
             install_linux_deps
-            platform_specific=1
             ;;
         darwin*)
             install_macos_deps
-            platform_specific=1
             ;;
         mingw*|cygwin*|msys*)
             install_windows_deps
-            platform_specific=1
             ;;
         *)
             log_warning "Unsupported platform: $os"
-            log_info "You may need to install dependencies manually"
+            show_manual_instructions
             ;;
     esac
-    
-    return $platform_specific
 }
 
-# Linux distribution detection and package installation
+# Linux dependency installation
 install_linux_deps() {
-    local distro=""
-    local install_cmd=""
-    local font_pkg=""
-    local magic_pkg=""
+    log_info "Installing Linux dependencies..."
     
     # Detect distribution
     if [[ -f /etc/os-release ]]; then
         source /etc/os-release
         distro=$ID
-    fi
-    
-    # Check for WSL
-    if grep -qi "microsoft" /proc/version 2>/dev/null || [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
-        log_info "Detected WSL2 (Windows Subsystem for Linux)"
+    else
+        log_warning "Cannot detect Linux distribution"
+        return 1
     fi
     
     case "$distro" in
         ubuntu|debian|linuxmint)
             log_info "Detected Ubuntu/Debian-based system"
-            install_cmd="sudo apt-get install -y"
-            font_pkg="fonts-dejavu-core fontconfig"
-            magic_pkg="libmagic1 libmagic-dev file"
-            sudo apt-get update -y --quiet
+            # Install libmagic for file type detection
+            if command -v sudo >/dev/null 2>&1; then
+                sudo apt-get update
+                if sudo apt-get install -y libmagic1 file; then
+                    log_success "Linux dependencies installed"
+                else
+                    log_warning "Failed to install some dependencies, continuing..."
+                fi
+            else
+                log_warning "sudo not available, please install manually: apt-get install libmagic1 file"
+            fi
             ;;
         fedora|rhel|centos)
             log_info "Detected Fedora/RHEL-based system"
-            install_cmd="sudo dnf install -y"
-            font_pkg="dejavu-sans-mono-fonts fontconfig"
-            magic_pkg="file-devel file-libs"
+            if command -v sudo >/dev/null 2>&1; then
+                sudo dnf install -y file-libs file
+            else
+                log_warning "sudo not available, please install manually: dnf install file-libs file"
+            fi
             ;;
         arch|manjaro)
             log_info "Detected Arch Linux-based system"
-            install_cmd="sudo pacman -S --noconfirm"
-            font_pkg="ttf-dejavu fontconfig"
-            magic_pkg="file"
-            ;;
-        opensuse*)
-            log_info "Detected openSUSE-based system"
-            install_cmd="sudo zypper install -y"
-            font_pkg="dejavu-fonts fontconfig"
-            magic_pkg="file file-devel"
+            if command -v sudo >/dev/null 2>&1; then
+                sudo pacman -S --noconfirm file
+            else
+                log_warning "sudo not available, please install manually: pacman -S file"
+            fi
             ;;
         *)
-            log_warning "Unknown Linux distribution: $distro"
-            show_manual_instructions
-            return 1
+            log_warning "Unsupported Linux distribution: $distro"
             ;;
     esac
-    
-    # Install packages
-    log_info "Installing system dependencies..."
-    if $install_cmd $font_pkg $magic_pkg 2>/dev/null; then
-        log_success "System dependencies installed"
-        
-        # Update font cache
-        if command -v fc-cache >/dev/null 2>&1; then
-            sudo fc-cache -fv > /dev/null 2>&1 && log_success "Font cache updated"
-        fi
-        return 0
-    else
-        log_error "Failed to install system dependencies"
-        show_manual_instructions
-        return 1
-    fi
 }
 
 # macOS dependency installation
 install_macos_deps() {
-    log_info "Detected macOS"
+    log_info "Installing macOS dependencies..."
     
     if command -v brew >/dev/null 2>&1; then
-        log_info "Using Homebrew package manager"
-        
-        # Install libmagic
-        if brew install libmagic --quiet; then
-            log_success "libmagic installed via Homebrew"
+        if brew install libmagic; then
+            log_success "macOS dependencies installed"
         else
-            log_error "Failed to install libmagic"
-            return 1
+            log_warning "Failed to install libmagic with Homebrew"
         fi
-        
-        # Install fonts (optional on macOS as system fonts may suffice)
-        log_info "Installing DejaVu fonts..."
-        brew tap homebrew/cask-fonts --quiet
-        if brew install --cask font-dejavu-sans-mono --quiet; then
-            log_success "DejaVu fonts installed"
-        else
-            log_warning "Font installation failed, but DAT should work with system fonts"
-        fi
-        return 0
     else
-        log_warning "Homebrew not found"
-        log_info "Install Homebrew from: https://brew.sh"
-        log_info "Or install manually:"
-        log_info "  - Download fonts: https://dejavu-fonts.github.io/"
-        log_info "  - Install libmagic: brew install libmagic"
-        return 1
+        log_warning "Homebrew not installed. Install from: https://brew.sh"
     fi
 }
 
 # Windows dependency installation
 install_windows_deps() {
-    log_info "Detected Windows (Git Bash / MSYS2 / Cygwin)"
-    
-    # Install Windows-compatible python-magic
-    log_info "Installing Windows-compatible file detection..."
-    if $PYTHON_CMD -m pip install python-magic-bin --quiet; then
-        log_success "Windows file detection installed"
-    else
-        log_error "Failed to install Windows file detection"
-        return 1
-    fi
-    
-    log_info "For optimal PDF generation, install DejaVu fonts:"
-    log_info "  Download: https://dejavu-fonts.github.io/Download.html"
-    log_info "  Or use Chocolatey: choco install dejavufonts"
+    log_info "Windows detected - using python-magic-bin for file detection"
+    # python-magic-bin will be installed via pip
     return 0
 }
 
-# Show manual installation instructions
+# Show manual instructions
 show_manual_instructions() {
     log_info "Manual installation instructions:"
-    log_info "Ubuntu/Debian: sudo apt-get install fonts-dejavu-core fontconfig libmagic1 libmagic-dev"
-    log_info "Fedora/RHEL:   sudo dnf install dejavu-sans-mono-fonts fontconfig file-devel file-libs"
-    log_info "Arch Linux:    sudo pacman -S ttf-dejavu fontconfig file"
-    log_info "macOS:         brew install libmagic && brew install --cask font-dejavu-sans-mono"
+    log_info "Ubuntu/Debian: sudo apt-get install libmagic1 file"
+    log_info "Fedora/RHEL:   sudo dnf install file-libs file"
+    log_info "Arch Linux:    sudo pacman -S file"
+    log_info "macOS:         brew install libmagic"
 }
 
-# Verify Python dependencies
-verify_python_deps() {
+# Verify installation
+verify_installation() {
     local python_cmd="$1"
-    log_info "Verifying Python dependencies..."
     
-    $python_cmd -c "
+    log_info "Verifying installation..."
+    
+    "$python_cmd" -c "
 import sys
-import importlib.util
+print('Verifying DAT installation...')
 
-# Required packages with minimum versions
-required_packages = {
-    'rich': '13.0.0',
-    'cryptography': '41.0.0', 
-    'reportlab': '4.0.0',
-    'python-magic': '0.4.27',
-    'Pillow': '10.0.0',
-    'colorama': '0.4.6'
-}
+# Test core imports
+tests = [
+    ('rich', 'from rich.console import Console'),
+    ('colorama', 'import colorama'),
+    ('typer', 'import typer'),
+    ('yaml', 'import yaml'),
+    ('packaging', 'import packaging.version')
+]
 
-print('🔍 Checking Python dependencies...')
 all_ok = True
-
-for package, min_version in required_packages.items():
+for name, test_code in tests:
     try:
-        # Try to import
-        spec = importlib.util.find_spec(package.split('-')[-1])
-        if spec is None:
-            print(f'❌ {package}: NOT INSTALLED')
-            all_ok = False
-            continue
-            
-        # Import successfully
-        module = __import__(package.split('-')[-1])
-        
-        # Try to get version
-        try:
-            version = getattr(module, '__version__', 'unknown')
-            status = '✅' if version != 'unknown' else '⚠️'
-            print(f'{status} {package}: {version}')
-            
-            # Check version if we can
-            if version != 'unknown' and version < min_version:
-                print(f'   ⚠️  Version {version} < {min_version}, consider upgrading')
-                
-        except AttributeError:
-            print(f'⚠️  {package}: imported (version unknown)')
-            
+        exec(test_code)
+        print(f'✅ {name}: OK')
     except ImportError as e:
-        print(f'❌ {package}: IMPORT FAILED - {e}')
+        print(f'❌ {name}: FAILED - {e}')
         all_ok = False
 
-# Test functionality
-print('\n🧪 Testing functionality...')
+# Test DAT package
 try:
-    import magic
-    # Test basic functionality
-    magic.from_buffer(b'test')
-    print('✅ python-magic: functional')
-except Exception as e:
-    print(f'❌ python-magic: {e}')
+    import dat
+    print(f'✅ dat: OK (version {dat.__version__})')
+except ImportError as e:
+    print(f'❌ dat: FAILED - {e}')
+    all_ok = False
 
+# Test DAT CLI
 try:
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfbase import pdfmetrics
-    print('✅ reportlab: PDF functionality OK')
-except Exception as e:
-    print(f'❌ reportlab: {e}')
+    from dat.cli import main
+    print('✅ dat.cli: OK')
+except ImportError as e:
+    print(f'❌ dat.cli: FAILED - {e}')
+    all_ok = False
 
-try:
-    import cryptography
-    print('✅ cryptography: encryption ready')
-except Exception as e:
-    print(f'❌ cryptography: {e}')
-
-try:
-    from rich.console import Console
-    print('✅ rich: terminal output ready')
-except Exception as e:
-    print(f'❌ rich: {e}')
-
-if not all_ok:
-    print('\n💥 Some dependencies failed verification')
-    sys.exit(1)
+if all_ok:
+    print('All core dependencies verified!')
 else:
-    print('\n🎉 All Python dependencies verified!')
+    print('Some dependencies failed - DAT may have limited functionality')
+    sys.exit(1)
 "
 }
 
-# Verify system dependencies
-verify_system_deps() {
-    log_info "Verifying system dependencies..."
-    
-    # Check file command (libmagic)
-    if command -v file >/dev/null 2>&1; then
-        if echo "test" | file - >/dev/null 2>&1; then
-            log_success "file command (libmagic): functional"
-        else
-            log_warning "file command available but has issues"
-        fi
-    else
-        log_warning "file command (libmagic) not available"
-    fi
-    
-    # Check fonts
-    if command -v fc-list >/dev/null 2>&1; then
-        if fc-list | grep -i "dejavu" >/dev/null 2>&1; then
-            log_success "DejaVu fonts: installed"
-        else
-            log_warning "DejaVu fonts not found via fontconfig"
-        fi
-    else
-        log_info "fontconfig not available, skipping font verification"
-    fi
-}
-
-# Make dat executable and test
+# Setup DAT executable
 setup_dat() {
     local python_cmd="$1"
     
-    # Make executable if dat file exists
-    if [[ -f "dat" ]]; then
-        log_info "Making dat script executable..."
-        chmod +x dat
-        log_success "dat script is now executable"
-    else
-        log_warning "dat script not found in current directory"
-        return 1
+    log_info "Testing DAT installation..."
+    
+    # Test DAT functionality
+    if command -v dat >/dev/null 2>&1; then
+        log_success "DAT command available in PATH"
+        if dat --version >/dev/null 2>&1 || dat --help >/dev/null 2>&1; then
+            log_success "DAT is functional"
+            return 0
+        fi
     fi
     
-    # Test basic functionality
-    log_info "Testing DAT installation..."
-    if $python_cmd dat --version >/dev/null 2>&1; then
-        local version=$($python_cmd dat --version 2>/dev/null || echo "unknown")
-        log_success "DAT functional - version $version"
+    # Fallback: try python module
+    log_info "Trying Python module execution..."
+    if "$python_cmd" -m dat --version >/dev/null 2>&1 || "$python_cmd" -m dat --help >/dev/null 2>&1; then
+        log_success "DAT works via Python module"
+        log_info "You can run DAT using: $python_cmd -m dat"
         return 0
-    else
-        log_error "DAT functionality test failed"
-        return 1
     fi
+    
+    log_warning "DAT command not found in PATH"
+    log_info "You may need to add Python user base bin to your PATH:"
+    log_info "  export PATH=\"\$($python_cmd -m site --user-base)/bin:\$PATH\""
+    return 1
+}
+
+# Ask for installation mode
+choose_installation_mode() {
+    echo
+    log_info "Choose installation mode:"
+    echo "1) Development - Install from current source with dev dependencies"
+    echo "2) Production - Install from current source (production only)"
+    echo "3) PyPI - Install latest release from PyPI"
+    echo
+    read -p "Enter choice [1-3] (default: 1): " choice
+    
+    case "${choice:-1}" in
+        1|"") echo "dev" ;;
+        2) echo "prod" ;;
+        3) echo "pypi" ;;
+        *) 
+            log_error "Invalid choice"
+            choose_installation_mode
+            ;;
+    esac
 }
 
 # Main installation function
@@ -419,37 +349,53 @@ main() {
     # Detect Python
     PYTHON_CMD=$(detect_python) || exit 1
     
-    # Install Python dependencies
-    install_python_deps "$PYTHON_CMD" || exit 1
+    # Choose installation mode
+    INSTALL_MODE=$(choose_installation_mode)
     
-    # Install system dependencies
-    if install_system_deps; then
-        log_success "Platform-specific dependencies handled"
-    else
-        log_warning "Platform-specific dependencies may need manual installation"
+    # Upgrade pip
+    log_info "Upgrading pip..."
+    if ! "$PYTHON_CMD" -m pip install --upgrade pip; then
+        log_warning "pip upgrade failed, continuing anyway..."
     fi
     
-    # Verify installations
-    verify_python_deps "$PYTHON_CMD" || exit 1
-    verify_system_deps
+    # Install system dependencies (non-critical)
+    log_info "Installing system dependencies..."
+    if install_system_deps; then
+        log_success "System dependencies handled"
+    else
+        log_warning "System dependencies may need manual installation"
+    fi
+    
+    # Install DAT package
+    log_info "Installing DAT package..."
+    install_dat_package "$PYTHON_CMD" "$INSTALL_MODE" || exit 1
+    
+    # Verify installation
+    verify_installation "$PYTHON_CMD" || exit 1
     
     # Setup DAT
-    setup_dat "$PYTHON_CMD" || exit 1
+    log_info "Setting up DAT..."
+    setup_dat "$PYTHON_CMD"
     
-    # Final success message
+    # Success message
     echo
     log_success "🎉 DAT installation completed successfully!"
     echo
     log_info "🚀 Quick Start:"
-    log_info "  dat                          # Scan current directory"
-    log_info "  dat --deep                   # Deep scan (includes binaries)"
-    log_info "  dat --pdf report.pdf         # Generate PDF report"
-    log_info "  dat -f src                   # Scan only src folder"
-    log_info "  dat -s main.py               # Scan only main.py file"
-    log_info "  dat --help                   # Show all options"
+    
+    if command -v dat >/dev/null 2>&1; then
+        log_info "  dat --version    # Check version"
+        log_info "  dat --help       # Show help"
+        log_info "  dat scan         # Scan current directory"
+    else
+        log_info "  $PYTHON_CMD -m dat --version    # Check version"
+        log_info "  $PYTHON_CMD -m dat --help       # Show help"
+        log_info "  $PYTHON_CMD -m dat scan         # Scan current directory"
+    fi
+    
     echo
-    log_info "📖 Documentation: https://github.com/your-org/dat"
-    log_info "🐛 Issues: https://github.com/your-org/dat/issues"
+    log_info "📚 Documentation: https://github.com/Outer-Void/dat"
+    log_info "🐛 Issues: https://github.com/Outer-Void/dat/issues"
     echo
 }
 

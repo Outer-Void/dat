@@ -1,11 +1,12 @@
 """Synchronous repository scanning utilities."""
+
 from __future__ import annotations
 
 import fnmatch
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, List
 
 from ..utils import is_binary
 
@@ -43,21 +44,22 @@ class ScanResult:
     """Return value from :func:`scan_repository`."""
 
     root: Path
-    files: List[FileRecord] = field(default_factory=list)
-    skipped: List[SkipEntry] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+    files: list[FileRecord] = field(default_factory=list)
+    skipped: list[SkipEntry] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
     stats: ScanStatistics = field(default_factory=ScanStatistics)
 
 
-def should_ignore(path: Path, patterns: Iterable[str], *, root: Path | None = None) -> bool:
+def should_ignore(
+    path: Path, patterns: Iterable[str], *, root: Path | None = None
+) -> bool:
     """Return True when *path* matches any ignore pattern."""
 
     if not patterns:
         return False
     relative = str(path.relative_to(root)) if root else path.as_posix()
     return any(
-        fnmatch.fnmatch(relative, pattern)
-        or fnmatch.fnmatch(path.name, pattern)
+        fnmatch.fnmatch(relative, pattern) or fnmatch.fnmatch(path.name, pattern)
         for pattern in patterns
     )
 
@@ -94,7 +96,7 @@ def scan_repository(
     result = ScanResult(root=root.resolve())
     ignore_patterns = list(ignore_patterns or [])
 
-    for dirpath, dirnames, filenames in os.walk(result.root):
+    for dirpath, _dirnames, filenames in os.walk(result.root):
         current = Path(dirpath)
 
         for name in filenames:
@@ -156,9 +158,8 @@ def scan_repository(
 
 __all__ = [
     "FileRecord",
+    "ScanResult",
     "ScanStatistics",
     "SkipEntry",
-    "ScanResult",
     "scan_repository",
 ]
-

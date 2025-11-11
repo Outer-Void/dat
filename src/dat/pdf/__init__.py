@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -14,6 +14,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 from ..rules import RuleFinding
 from ..scanner import ScanResult
+
 
 MONO_FONTS = (
     ("DejaVuSansMono", "DejaVuSansMono.ttf"),
@@ -41,9 +42,13 @@ def write_pdf_report(
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     font_name = _register_font()
-    document = SimpleDocTemplate(str(destination), pagesize=letter, title="DAT Audit Report")
+    document = SimpleDocTemplate(
+        str(destination), pagesize=letter, title="DAT Audit Report"
+    )
 
-    heading = ParagraphStyle(name="Heading", fontName=font_name, fontSize=16, textColor=colors.darkgreen)
+    heading = ParagraphStyle(
+        name="Heading", fontName=font_name, fontSize=16, textColor=colors.darkgreen
+    )
     body = ParagraphStyle(name="Body", fontName=font_name, fontSize=10, leading=12)
 
     story: list = []

@@ -1,6 +1,14 @@
-colorama>=0.4.6,<0.5.0
-python-magic>=0.4.27,<1.0
-reportlab>=4.0.8,<5.0
-Pillow>=11.3.0,<12.0
-rich>=13.7.0,<14.0
-cryptography>=42.0.0,<43.0
+# DAT Core Dependencies
+requests>=2.32.5
+colorama>=0.4.6
+packaging>=25.0
+pyyaml>=6.0.3
+rich>=14.2.0
+typer>=0.12.1
+
+# Optional: PDF reporting
+# reportlab>=4.4.4
+
+# Optional: Security tools
+# bandit>=1.8.6
+# safety>=3.7.0

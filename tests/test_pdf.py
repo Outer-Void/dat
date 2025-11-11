@@ -18,7 +18,9 @@ def test_write_pdf_report(tmp_path):
     metadata = build_metadata(tmp_path)
     output = tmp_path / "audit.pdf"
 
-    write_pdf_report(output, result, [RuleFinding("id", "message", "low", "file.txt")], metadata)
+    write_pdf_report(
+        output, result, [RuleFinding("id", "message", "low", "file.txt")], metadata
+    )
 
     assert output.exists()
     assert output.stat().st_size > 0

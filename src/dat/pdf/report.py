@@ -1,15 +1,16 @@
 """PDF export utilities for DAT reports."""
+
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table
 
-from ..scanner.core import FileReport, ScanReport
+from ..scanner.core import ScanReport
 
 
 def _document(report: ScanReport) -> Iterable:
