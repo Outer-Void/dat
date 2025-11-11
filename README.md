@@ -86,14 +86,17 @@ Signed/verbose runs and combined outputs:
 Generate custom output location and doc type:
 
 ```bash
+# From working Dir
 dat -o /path/to/custom_label.md
 ```
 
 ```bash
-dat -o /path/to/custom_label.pdf
+# From any Dir
+dat /path/to/project/ -o /path/to/custom_label.pdf
 ```
 
 ```bash
+# From working Dir
 dat -o /path/to/custom_label.json
 ```
 
