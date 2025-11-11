@@ -197,13 +197,9 @@ memory_profile.out
 *.ear
 
 # Media files
-*.jpg
-*.jpeg
-*.png
 *.gif
 *.bmp
 *.tiff
-*.ico
 *.avi
 *.mov
 *.mp4
