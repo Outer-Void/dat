@@ -4,7 +4,7 @@ colorama>=0.4.6
 packaging>=25.0
 pyyaml>=6.0.3
 rich>=14.2.0
-typer>=0.12.1
+typer>=0.20.0
 
 # Optional: PDF reporting
 # reportlab>=4.4.4
