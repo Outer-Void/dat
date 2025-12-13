@@ -212,7 +212,7 @@ dat --lrc --pdf compliance-report.pdf --sign
 
 License
 
-DAT is released under the MIT License - see the LICENSE file for details.
+DAT is dual-licensed. Open-source use is under the Apache License 2.0 (see LICENSE-APACHE). Commercial use, including embedding in proprietary products or hosted services, requires a commercial license (see LICENSE-COMMERCIAL). Contact theoutervoid@outlook.com for commercial terms.
 
 ## Credits
 
