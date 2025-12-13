@@ -6,12 +6,12 @@ authors = [
     {name = "Outer Void Team, Justadudeinspace", email = "outervoid.blux@gmail.com"}
 ]
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 keywords = ["security", "audit", "dependencies", "vulnerability", "scanner"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -60,6 +60,14 @@ dat = "dat.cli:main"
 [build-system]
 requires = ["setuptools>=45.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+license-files = [
+    "LICENSE",
+    "LICENSE-APACHE",
+    "LICENSE-COMMERCIAL",
+    "NOTICE",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

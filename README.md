@@ -174,5 +174,11 @@ Repo link: **LRC — Local Repo Compiler** → [Outer-Void/lrc](https://github.c
 
 ## License
 
-MIT — see [`LICENSE`](./LICENSE).
+This project is dual-licensed. Open-source use is under the Apache License 2.0 (see [`LICENSE-APACHE`](./LICENSE-APACHE)). Commercial use, including embedding in paid products or hosted services, requires a commercial license (see [`LICENSE-COMMERCIAL`](./LICENSE-COMMERCIAL)).
+
+### Apache License 2.0
+You may use, modify, and distribute the software under the terms of Apache-2.0, provided you include required notices and abide by its conditions.
+
+### Commercial Licensing
+For business or revenue-generating use cases beyond Apache-2.0 (e.g., embedding in proprietary products, SaaS/hosted offerings, or large-scale internal deployments), obtain a commercial agreement. Contact **theoutervoid@outlook.com** for terms.
 
