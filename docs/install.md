@@ -7,8 +7,8 @@ title: Install
 ```bash
 git clone https://github.com/Justadudeinspace/dat.git
 cd dat
-chmod +x install_deps.sh
-./install_deps.sh
+chmod +x scripts/install.sh
+./scripts/install.sh
 python3 dat
 ```
 

@@ -11,8 +11,8 @@ title: DAT · Dev Audit Tool
   <p><strong>Install quickstart</strong></p>
   <pre><code>git clone https://github.com/Justadudeinspace/dat.git
 cd dat
-chmod +x install_deps.sh
-./install_deps.sh
+chmod +x scripts/install.sh
+./scripts/install.sh
 python3 dat</code></pre>
   <p>
     <a class="btn" href="{{ site.repo_url }}">View on GitHub</a>

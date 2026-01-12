@@ -55,8 +55,8 @@ unzip dat-v3.0.0-alpha.1.zip && cd dat
 
 ```bash
 # Run the comprehensive installer
-chmod +x install_deps.sh
-./install_deps.sh
+chmod +x scripts/install.sh
+./scripts/install.sh
 ```
 
 ### What the installer does:
@@ -76,15 +76,15 @@ chmod +x install_deps.sh
 ```bash
 # Ubuntu/Debian
 sudo apt-get update
-./install_deps.sh
+./scripts/install.sh
 
 # Fedora/RHEL
 sudo dnf groupinstall "Development Tools"
-./install_deps.sh
+./scripts/install.sh
 
 # Arch Linux
 sudo pacman -S base-devel
-./install_deps.sh
+./scripts/install.sh
 ```
 
 ### macOS
@@ -92,18 +92,18 @@ sudo pacman -S base-devel
 ```bash
 # With Homebrew (recommended)
 brew install python3 libmagic
-./install_deps.sh
+./scripts/install.sh
 
 # Without Homebrew
 python3 -m ensurepip
-./install_deps.sh
+./scripts/install.sh
 ```
 
 ### Windows
 
 ```bash
 # Git Bash / WSL2
-./install_deps.sh
+./scripts/install.sh
 
 # If Python not found, install from:
 # https://python.org/downloads/
@@ -114,7 +114,7 @@ python3 -m ensurepip
 ```bash
 pkg update && pkg upgrade
 pkg install python libmagic
-./install_deps.sh
+./scripts/install.sh
 ```
 
 ---
@@ -286,7 +286,7 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY . .
 RUN pip install -r requirements.txt
-RUN chmod +x dat install_deps.sh
+RUN chmod +x scripts/install.sh
 
 ENTRYPOINT ["./dat"]
 ```
@@ -305,7 +305,7 @@ docker run -v $(pwd):/scan dat /scan --deep --json report.json
   run: |
     git clone https://github.com/Justadudeinspace/dat.git
     cd dat
-    ./install_deps.sh
+    ./scripts/install.sh
 
 - name: Security Scan
   run: |
@@ -343,12 +343,12 @@ python3 --version || python --version
 
 ```bash
 # Fix script permissions
-chmod +x dat install_deps.sh bootstrap.sh
+chmod +x scripts/install.sh bootstrap.sh
 
 # Use virtual environment to avoid system installs
 python3 -m venv venv
 source venv/bin/activate
-./install_deps.sh
+./scripts/install.sh
 ```
 
 ### Missing Dependencies
@@ -439,11 +439,11 @@ ls -la *.pdf *.json *.asc && echo "✅ Installation successful"
 # Update to latest version
 cd dat
 git pull origin main
-./install_deps.sh --upgrade
+./scripts/install.sh --mode prod
 
-# Or reinstall completely
+# Or reinstall completely (venv install)
 rm -rf .venv
-./install_deps.sh
+./scripts/install.sh --venv --mode prod
 ```
 
 ---
@@ -480,4 +480,3 @@ DAT: 3.0.0-alpha.1
 ---
 
 DAT is now installed and ready for enterprise security scanning and compliance auditing.
-
