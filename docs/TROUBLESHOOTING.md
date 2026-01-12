@@ -48,7 +48,7 @@ export PATH="$PATH:$(pwd)"
 
 ```bash
 # Re-run installation
-./install_deps.sh
+./scripts/install.sh
 
 # Or manual installation
 python3 -m venv .venv
@@ -124,7 +124,7 @@ pip3 install --user -r requirements.txt
 
 ```bash
 # Run with debug output
-bash -x ./install_deps.sh
+bash -x ./scripts/install.sh
 
 # Check Python version
 python3 --version  # Requires 3.8+
@@ -512,7 +512,7 @@ dat . --no-sign
 
 ```bash
 # Fix script permissions
-chmod +x dat install_deps.sh
+chmod +x scripts/install.sh
 
 # Use virtual environment
 python3 -m venv venv
@@ -587,7 +587,7 @@ rm -f ~/.datconfig
 
 # Fresh installation
 git clean -fdx
-./install_deps.sh
+./scripts/install.sh
 
 # Test basic functionality
 ./dat . --safe --report test.json

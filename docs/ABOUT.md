@@ -144,7 +144,7 @@ dat/
 ### **Quick Installation**
 ```bash
 # Run the installer
-./install_deps.sh
+./scripts/install.sh
 
 # Or install manually
 pip install -e .

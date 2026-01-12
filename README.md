@@ -44,14 +44,14 @@ uv tool install outervoid-dat
 pipx install outervoid-dat
 ```
 
-### curl/wget bootstrap (uv → pipx → pip --user)
+### curl/wget bootstrap (pipx → uv → venv/pip --user)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Outer-Void/dat/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Outer-Void/dat/v3.0.0/scripts/install.sh | bash
 ```
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/Outer-Void/dat/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/Outer-Void/dat/v3.0.0/scripts/install.sh | bash
 ```
 
 > Need PDF output? Install with `outervoid-dat[pdf]` (e.g., `uv tool install "outervoid-dat[pdf]"`).
@@ -61,8 +61,8 @@ wget -qO- https://raw.githubusercontent.com/Outer-Void/dat/main/install.sh | bas
 ```bash
 git clone https://github.com/Outer-Void/dat.git
 cd dat
-chmod +x dat install_deps.sh
-./install_deps.sh
+chmod +x scripts/install.sh
+./scripts/install.sh --mode dev
 ./dat                  # default Markdown report in artifacts/report.md
 ```
 
@@ -71,7 +71,8 @@ chmod +x dat install_deps.sh
 dat                    # default report.md generates audit report with main files code base print output (Entire project codebase located within a single document)
 ```
 
-> Make sure you’re using a venv, `install_deps.sh` should create/activate first; the script supports it. Permissions errors? `chmod +x dat install_deps.sh`.
+> Termux: the installer uses `pkg install python3` and avoids mixing prefixes.  
+> proot-distro: use the proot shell and avoid Termux paths in `$PATH`.
 
 ### Docker
 
@@ -80,7 +81,7 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY . .
 RUN pip install -r requirements.txt
-RUN chmod +x dat install_deps.sh
+RUN chmod +x scripts/install.sh
 ENTRYPOINT ["./dat"]
 ```
 
@@ -140,7 +141,7 @@ dat -o /path/to/custom_label.json
   run: |
     git clone https://github.com/Outer-Void/dat.git
     cd dat
-    ./install_deps.sh
+    ./scripts/install.sh
 
 - name: Security Scan
   run: |
@@ -177,7 +178,7 @@ Repo link: **LRC — Local Repo Compiler** → [Outer-Void/lrc](https://github.c
 
 ## Troubleshooting
 
-- **Permissions:** `chmod +x dat install_deps.sh bootstrap.sh`  
+- **Permissions:** `chmod +x scripts/install.sh bootstrap.sh`  
 - **Missing deps:** `pip install --force-reinstall -r requirements.txt` (Linux may need `libmagic`).  
 - **Termux:** `termux-setup-storage` and clone into `~/storage/shared` if needed.
 
