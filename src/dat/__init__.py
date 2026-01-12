@@ -82,7 +82,7 @@ def repository_root(start: Path | None = None, marker: str = ".git") -> Path:
     raise FileNotFoundError(f"No repository root found (looking for '{marker}' marker)")
 
 
-def ensure_python_version(min_version: tuple[int, int] = (3, 8)) -> None:
+def ensure_python_version(min_version: tuple[int, int] = (3, 9)) -> None:
     """
     Ensure the current Python version meets minimum requirements.
 

@@ -43,7 +43,7 @@ detect_python() {
     log_info "Detecting Python..."
     
     # Try different Python commands in order of preference
-    for py_cmd in python3.11 python3.10 python3.9 python3.8 python3 python; do
+    for py_cmd in python3.12 python3.11 python3.10 python3.9 python3 python; do
         if command -v "$py_cmd" >/dev/null 2>&1; then
             # Check Python version
             version=$("$py_cmd" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
@@ -52,18 +52,18 @@ detect_python() {
             major=$(echo "$version" | cut -d. -f1)
             minor=$(echo "$version" | cut -d. -f2)
             
-            if [[ $major -eq 3 ]] && [[ $minor -ge 8 ]]; then
+            if [[ $major -eq 3 ]] && [[ $minor -ge 9 ]]; then
                 log_success "Found Python $version using $py_cmd"
                 printf '%s\n' "$py_cmd"
                 return 0
             else
-                log_warning "Python $version found but 3.8+ required"
+                log_warning "Python $version found but 3.9+ required"
             fi
         fi
     done
     
-    log_error "No suitable Python 3.8+ installation found"
-    log_info "Please install Python 3.8 or newer from: https://python.org/downloads/"
+    log_error "No suitable Python 3.9+ installation found"
+    log_info "Please install Python 3.9 or newer from: https://python.org/downloads/"
     return 1
 }
 

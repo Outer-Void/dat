@@ -28,7 +28,33 @@
 
 ---
 
-## Quickstart
+## Install
+
+Requires Python 3.9+.
+
+### Recommended: uv (fast, isolated)
+
+```bash
+uv tool install outervoid-dat
+```
+
+### pipx (isolated CLI install)
+
+```bash
+pipx install outervoid-dat
+```
+
+### curl/wget bootstrap (uv → pipx → pip --user)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Outer-Void/dat/main/install.sh | bash
+```
+
+```bash
+wget -qO- https://raw.githubusercontent.com/Outer-Void/dat/main/install.sh | bash
+```
+
+> Need PDF output? Install with `outervoid-dat[pdf]` (e.g., `uv tool install "outervoid-dat[pdf]"`).
 
 ### From source (recommended while 3.x is in flux)
 
@@ -157,6 +183,27 @@ Repo link: **LRC — Local Repo Compiler** → [Outer-Void/lrc](https://github.c
 
 ---
 
+## Build & Publish
+
+```bash
+python -m build
+twine check dist/*
+```
+
+TestPyPI:
+
+```bash
+twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+```
+
+PyPI:
+
+```bash
+twine upload dist/*
+```
+
+---
+
 ## Security & Telemetry
 
 - No outbound connections; deterministic local outputs.  
@@ -175,4 +222,3 @@ Repo link: **LRC — Local Repo Compiler** → [Outer-Void/lrc](https://github.c
 ## License
 
 MIT — see [`LICENSE`](./LICENSE).
-

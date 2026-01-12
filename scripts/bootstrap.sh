@@ -155,7 +155,7 @@ bootstrap() {
     # --- Python availability check ---
     print_step "Checking Python installation..."
     if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
-        print_error "Python3 not found. Please install Python 3.8+ first."
+        print_error "Python3 not found. Please install Python 3.9+ first."
         
         case "$PLATFORM" in
             macOS)

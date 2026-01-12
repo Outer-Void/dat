@@ -33,7 +33,6 @@ from .integration import (
 )
 from .integration.signing import sign_artifact
 from .logging.audit import append_encrypted_log
-from .pdf import write_pdf_report
 from .report import (
     build_metadata,
     calculate_report_fingerprint,
@@ -51,6 +50,21 @@ console = Console()
 app = typer.Typer(
     no_args_is_help=False, help="DAT - Dev Audit Tool | Enterprise Security Scanning"
 )
+
+
+def _write_pdf_report(
+    path: Path, result: ScanResult, findings: Iterable[RuleFinding], metadata: dict
+) -> None:
+    try:
+        from .pdf import write_pdf_report
+    except ModuleNotFoundError:
+        console.print(
+            "[red]PDF output requires ReportLab. Install with "
+            '`pip install "outervoid-dat[pdf]"`.[/red]'
+        )
+        raise typer.Exit(1) from None
+    write_pdf_report(path, result, findings, metadata)
+
 
 # =============================================================================
 # dat cmd — print main code files (incl. scripts) into a single Markdown file
@@ -740,7 +754,7 @@ def write_report_file(
         atomic_write(path, ("\n".join(lines) + "\n").encode("utf-8"))
         console.print(f"[green]✓ JSONL report saved:[/green] {path}")
     elif format_type == "pdf":
-        write_pdf_report(path, result, findings, metadata)
+        _write_pdf_report(path, result, findings, metadata)
         console.print(f"[green]✓ PDF report saved:[/green] {path}")
     elif format_type in {"md", "markdown"}:
         write_markdown_report(path, result, findings, metadata)
