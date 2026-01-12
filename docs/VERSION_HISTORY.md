@@ -59,7 +59,7 @@
 - Basic command-line interface with essential options
 - Simple text output format for quick reviews
 - Project renamed to DAT (Dev Audit Tool)
-- Open source release under Apache License 2.0 (dual-licensed with a commercial option)
+- Open source release under MIT License
 
 ### 📊 Basic Features
 - File statistics (size, lines, type categorization)
