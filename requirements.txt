@@ -5,6 +5,7 @@ packaging>=25.0
 pyyaml>=6.0.3
 rich>=14.2.0
 typer>=0.20.0
+cryptography>=42.0.0
 
 # Optional: PDF reporting
 # reportlab>=4.4.4
