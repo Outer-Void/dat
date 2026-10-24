@@ -1,0 +1,12 @@
+# Default policy for running DAT through BLUX. DAT only reads; nothing here grants writes.
+contract: blux.policy
+contract_version: "1.0"
+policy_id: dat-default
+default_effect: deny
+rules:
+  - rule_id: allow-read-only-audits
+    effect: allow
+    capabilities: ["repo.*", "package.audit", "artifact.audit", "policy.verify"]
+    actor_types: [user, service, agent]
+    max_side_effects: read
+    grants: ["fs:read:target"]

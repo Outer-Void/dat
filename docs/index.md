@@ -1,37 +1,25 @@
 ---
 layout: default
-title: DAT · Dev Audit Tool
-
+title: DAT · Developer's Audit Tool
 ---
 
-# DAT — Dev Audit Tool
-<p class="lead">Compile an entire repo to a single <strong>Markdown/TXT/PDF</strong> artifact, or browse it live in the terminal. Cross-platform. Fast. Space-age.</p>
+# DAT: Developer's Audit Tool
+<p class="lead">Deterministic quality, security and release audits for repositories and build artifacts. Standalone, offline, with no AI judgment.</p>
 
 <div class="card">
-  <p><strong>Install quickstart</strong></p>
-  <pre><code>git clone https://github.com/Justadudeinspace/dat.git
-cd dat
-chmod +x scripts/install.sh
-./scripts/install.sh
-python3 dat</code></pre>
+  <p><strong>Quickstart</strong></p>
+  <pre><code>pip install "outervoid-dat @ git+https://github.com/Outer-Void/dat.git@v4.0.0"
+dat audit .
+dat release . --gate</code></pre>
   <p>
     <a class="btn" href="{{ site.repo_url }}">View on GitHub</a>
-    <a class="btn ghost" href="{{ site.baseurl }}/usage">Usage</a>
+    <a class="btn ghost" href="{{ site.baseurl }}/USAGE">Usage</a>
   </p>
 </div>
 
-## Highlights
-- **Single file resolve**: <code>dat -s dat_pdf</code>
-- **Ignore** junk: <code>-i .pyc __pycache__ .git node_modules</code>
-- **Export PDF**: <code>-o repo.pdf</code>
-- **Filter**: <code>-c</code> (code), <code>-d</code> (docs), <code>-m</code> (media), <code>-e py,js,md</code>
-- **Summaries**: top by lines & size
-
-## Favorite commands
-```bash
-dat -o repo.pdf
-dat -c -i .pyc __pycache__ -o code.md
-dat dat_pdf -o dat_pdf.pdf
-```
-
----
+- [Usage and exit codes](USAGE.md)
+- [Findings, report format and rule catalog](FINDINGS.md)
+- [Policies and the release gate](POLICY.md)
+- [Analyzer plugins](PLUGINS.md)
+- [DAT as a BLUX capability](BLUX.md)
+- [Audit of DAT 3.0](AUDIT-3.0.md)

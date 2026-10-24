@@ -292,3 +292,7 @@ backup/
 *.previous
 
 # End of .gitignore
+
+# DAT 4
+.ruff_cache/
+dat.sarif

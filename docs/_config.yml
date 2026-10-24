@@ -1,5 +1,5 @@
 title: "DAT · Dev Audit Tool"
-description: "Print a single file, working Dir, and/or sub-Dir's in Terminal context window. Or, Compile entire repo to a single .txt, .md, or .pdf. Cross-platform, fast, space-age."
+description: "Deterministic quality, security and release audits. Standalone CLI with a BLUX capability adapter."
 url: "https://justadudeinspace.github.io" 
 baseurl: "/dat"  
 
@@ -19,14 +19,14 @@ exclude:
 nav:
   - text: Home
     href: /
-  - text: Install
-    href: /install
   - text: Usage
-    href: /usage
-  - text: FAQ
-    href: /faq
-  - text: Changelog
-    href: /changelog
+    href: /USAGE
+  - text: Findings
+    href: /FINDINGS
+  - text: Policy
+    href: /POLICY
+  - text: BLUX
+    href: /BLUX
 
 # Repo links
-repo_url: "https://github.com/Justadudeinspace/dat"
+repo_url: "https://github.com/Outer-Void/dat"

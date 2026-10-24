@@ -1,225 +1,82 @@
-# DAT — Developer’s Audit Tool
+# DAT: Developer's Audit Tool
 
 <p align="center">
   <img src="docs/assets/dat-logo-space.png" alt="DAT logo" width="480">
 </p>
 
-**DAT** is a fast, local-first audit engine for codebases: secrets & policy checks, readable reports, and CI-ready outputs—no telemetry, no vendor lock-in.
+DAT is the Outer Void ecosystem's independent **quality, security and release authority**. Every check is
+deterministic: fixed rules over files, ASTs, manifests and archives. There is no AI judgment, no network
+access and no telemetry. It runs on its own; BLUX, CogA and cA are optional consumers, never dependencies.
 
-**Author:** `Outer Void Team, Justadudeinspace`  
-**Email:** `outervoid.blux@gmail.com`
+**Author:** Outer Void Team, Justadudeinspace · **Contact:** `outervoid.blux@gmail.com`
 
----
-
-## Why DAT
-
-- **Readable by design** — Markdown and JSON/JSONL outputs that humans and CI both love.  
-- **Local & reproducible** — runs entirely on your machine; deterministic reports.  
-- **CI/CD and Docker friendly** — first-class snippets below.
-
----
-
-## Features
-
-- Secrets & credential patterns, policy rules, merge-marker detection  
-- **Formats:** `md`, `json`, `jsonl`, optional `pdf` export  
-- **Full-context Markdown** (optionally includes code blocks with masked secrets)  
-- **LRC bridge** (Local Repo Compiler) — write `.lrc-audit.json` next to your build metadata for downstream packaging and provenance.
-
----
-
-## Install
-
-Requires Python 3.9+.
-
-### Recommended: uv (fast, isolated)
-
-```bash
-uv tool install outervoid-dat
+```sh
+pip install "outervoid-dat @ git+https://github.com/Outer-Void/dat.git@v4.0.0"   # Python 3.11+, no dependencies
+dat audit .                         # human report
+dat release . --gate                # release gate (exit 1 on blocking findings)
+dat security . --format json        # exactly one JSON document on stdout
+dat artifact dist/ --sarif dat.sarif
 ```
 
-### pipx (isolated CLI install)
+From a checkout: `pip install -e .`, or `./scripts/install.sh --mode dev`.
 
-```bash
-pipx install outervoid-dat
+## What it checks
+
+| Capability | Command | Covers |
+|---|---|---|
+| `repo.audit` | `dat audit` | Everything below for a repository |
+| `repo.security` | `dat security` | Secrets by exact token shape and guarded assignments, unsafe Python (AST), JS install scripts and `eval`, Android manifest flags and signing secrets, Dockerfile risks, unpinned VCS dependencies, insecure indexes |
+| `repo.quality` | `dat quality` | Merge conflicts, Python syntax errors, bare `except`, leftover debuggers, work markers, large files, mixed line endings |
+| `repo.release` | `dat release` | LICENSE/README/CHANGELOG, consistent versions, changelog entry, duplicate workflows, clean tree, version tag at HEAD, plus secrets and conflicts |
+| `package.audit` | `dat package` | `pyproject.toml`, `requirements*.txt`, `package.json`: metadata, pinning, lockfiles |
+| `artifact.audit` | `dat artifact` | Wheels, zips, tars, APK/JAR/AAR: path traversal, escaping links, setuid/devices, decompression bombs, wheel `RECORD` integrity, `SHA256SUMS`, secrets inside |
+| `policy.verify` | `dat policy verify` | Validates a policy and re-gates a saved report |
+
+The full rule catalog, with severities and confidences, is in [docs/FINDINGS.md](docs/FINDINGS.md).
+
+## Findings are not failures
+
+| Exit | Meaning |
+|---|---|
+| `0` | Audit completed; gate passed or not enforced |
+| `1` | Audit completed; enforced gate failed |
+| `2` | Usage error |
+| `3` | DAT could not complete the audit (missing target, invalid policy, analyzer failure, limit, signing) |
+
+In JSON this distinction is `outcome` (`completed` / `incomplete` / `error`), `gate.verdict` and a separate
+`errors[]`. If one analyzer fails, the rest still run. The report says which one failed, and DAT exits `3`
+instead of claiming a clean result.
+
+## Reports
+
+`text` (default), `json` (`dat.report` v1, [schema](src/dat/schemas/report.v1.schema.json)), `markdown` and
+`sarif` (2.1.0, for code-scanning UIs). Reports are byte-for-byte reproducible and never contain secrets;
+evidence is redacted (`AKIA…[REDACTED len=20]`). Findings carry a stable fingerprint for suppression and diffing.
+
+## Configuration
+
+A JSON policy at `.dat/policy.json` (or `--policy`) sets the gate threshold, severity overrides, reasoned
+suppressions, ignore paths and limits ([docs/POLICY.md](docs/POLICY.md)). `.datignore` excludes paths.
+`dat:ignore[rule.id]` on a line suppresses inline. Every suppression is listed in the report.
+
+## Extending and integrating
+
+- **Plugins:** subclass `dat.analyzers.Analyzer`, load with `--plugin` ([docs/PLUGINS.md](docs/PLUGINS.md)).
+- **BLUX:** `.blux/` exposes all seven capabilities through `dat blux-capability`. Results are recorded in
+  BLUX System and linked to the operation ([docs/BLUX.md](docs/BLUX.md)).
+- **lrc:** `dat audit --report BUILD_DIR` and `dat --from-lrc DIR` keep working ([docs/USAGE.md](docs/USAGE.md#legacy-invocations-pre-40)).
+- **CI:** `dat release . --gate --sarif dat.sarif`; see `.github/workflows/ci.yml`, which gates DAT on itself.
+
+## Development
+
+```sh
+make install   # editable install with dev extras
+make ci        # ruff, mypy --strict, pytest, wheel check, self-audit
 ```
 
-### curl/wget bootstrap (pipx → uv → venv/pip --user)
+What changed from 3.x and why: [CHANGELOG.md](CHANGELOG.md) and [docs/AUDIT-3.0.md](docs/AUDIT-3.0.md).
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/Outer-Void/dat/v3.0.0/scripts/install.sh | bash
-```
+## Licence
 
-```bash
-wget -qO- https://raw.githubusercontent.com/Outer-Void/dat/v3.0.0/scripts/install.sh | bash
-```
-
-> Need PDF output? Install with `outervoid-dat[pdf]` (e.g., `uv tool install "outervoid-dat[pdf]"`).
-
-### From source (recommended while 3.x is in flux)
-
-```bash
-git clone https://github.com/Outer-Void/dat.git
-cd dat
-chmod +x scripts/install.sh
-./scripts/install.sh --mode dev
-./dat                  # default Markdown report in artifacts/report.md
-```
-
-```bash
-# or run bootstrap direct
-dat                    # default report.md generates audit report with main files code base print output (Entire project codebase located within a single document)
-```
-
-> Termux: the installer uses `pkg install python3` and avoids mixing prefixes.  
-> proot-distro: use the proot shell and avoid Termux paths in `$PATH`.
-
-### Docker
-
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY . .
-RUN pip install -r requirements.txt
-RUN chmod +x scripts/install.sh
-ENTRYPOINT ["./dat"]
-```
-
-Build/run:
-
-```bash
-docker build -t dat .
-docker run -v "$PWD":/scan dat /scan --deep --json report.json
-```
-
----
-
-## Usage
-
-Basic:
-
-```bash
-./dat                       # scan current repo → report.md
-./dat --json report.json    # machine-readable
-./dat --jsonl report.jsonl  # streaming-friendly lines
-```
-
-Signed/verbose runs and combined outputs:
-
-```bash
-./dat --deep --pdf audit.pdf --json scan.json --sign --verbose
-```
-
-Generate custom output location and doc type:
-
-```bash
-# From working Dir
-dat -o /path/to/custom_label.md
-```
-
-```bash
-# From any Dir
-dat /path/to/project/ -o /path/to/custom_label.pdf
-```
-
-```bash
-# From working Dir
-dat -o /path/to/custom_label.json
-```
-
-### Options
-
-- `--report <path>`/`--json <path>`/`--jsonl <path>` for output selection  
-- Markdown can include **full code context with masking** when configured (default on).
-
----
-
-## CI/CD Example
-
-```yaml
-- name: Install DAT
-  run: |
-    git clone https://github.com/Outer-Void/dat.git
-    cd dat
-    ./scripts/install.sh
-
-- name: Security Scan
-  run: |
-    cd dat
-    ./dat --safe --json security-report.json
-```
-
----
-
-## LRC Integration
-
-**LRC is the Local Repo Compiler** — DAT can emit an audit next to your LRC build metadata for downstream tooling.
-
-```bash
-# Example: produce .lrc-audit.json with scan + findings + summary
-./dat --from-lrc
-```
-
-Under the hood DAT loads `.lrc-build.json` and merges it with integration config, then writes `.lrc-audit.json` (metadata, scan, findings, summary, build context).
-
-Repo link: **LRC — Local Repo Compiler** → [Outer-Void/lrc](https://github.com/Outer-Void/lrc)
-
-> There was an older README line implying “License & Regulatory Compliance.” That was incorrect; this section corrects it.
-
----
-
-## Output Formats
-
-- **Markdown (`report.md`)** — human-readable, can include per-file code sections with masked secrets.  
-- **JSON/JSONL** — structured for pipelines; validated in tests via `--report`.  
-- **PDF** — printable report (requires `reportlab`).
-
----
-
-## Troubleshooting
-
-- **Permissions:** `chmod +x scripts/install.sh bootstrap.sh`  
-- **Missing deps:** `pip install --force-reinstall -r requirements.txt` (Linux may need `libmagic`).  
-- **Termux:** `termux-setup-storage` and clone into `~/storage/shared` if needed.
-
----
-
-## Build & Publish
-
-```bash
-python -m build
-twine check dist/*
-```
-
-TestPyPI:
-
-```bash
-twine upload --repository-url https://test.pypi.org/legacy/ dist/*
-```
-
-PyPI:
-
-```bash
-twine upload dist/*
-```
-
----
-
-## Security & Telemetry
-
-- No outbound connections; deterministic local outputs.  
-- Optional signing (`--sign`) and append-only audit logs are supported.
-
----
-
-## Roadmap
-
-- TUI explorer, richer rule packs, baseline diffs, repair suggestions.
-
-(See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the living plan.)
-
----
-
-## License
-
-MIT — see [`LICENSE`](./LICENSE).
+MIT, see [LICENSE](LICENSE). The licence is unchanged by this rebuild; any change is an owner decision
+tracked in the Outer Void credits ledger (UNR-008).

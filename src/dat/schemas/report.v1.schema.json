@@ -1,0 +1,591 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dat:report:v1",
+  "title": "DAT report v1",
+  "description": "Deterministic output of a DAT audit capability. Findings describe the target; errors describe DAT failing to audit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "tool",
+    "capability",
+    "target",
+    "outcome",
+    "gate",
+    "summary",
+    "findings",
+    "suppressed",
+    "analyzers",
+    "errors",
+    "policy",
+    "linkage"
+  ],
+  "$defs": {
+    "finding": {
+      "$id": "urn:dat:finding:v1",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "analyzer",
+        "category",
+        "severity",
+        "confidence",
+        "title",
+        "message",
+        "location",
+        "evidence",
+        "remediation",
+        "fingerprint"
+      ],
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9][a-z0-9-]*)+$"
+        },
+        "analyzer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "enum": [
+            "security",
+            "quality",
+            "release",
+            "package",
+            "artifact"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "location": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "line",
+            "column",
+            "member"
+          ],
+          "properties": {
+            "path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "line": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "column": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "member": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "evidence": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "remediation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "line",
+        "column",
+        "member"
+      ],
+      "properties": {
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "column": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "member": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": [
+        "code",
+        "message",
+        "details"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z_]+$"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object"
+        },
+        "analyzer": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "properties": {
+    "contract": {
+      "const": "dat.report"
+    },
+    "version": {
+      "const": 1
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "const": "dat"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "capability": {
+      "enum": [
+        "repo.audit",
+        "repo.security",
+        "repo.quality",
+        "repo.release",
+        "package.audit",
+        "artifact.audit"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "kind",
+        "path"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "repository",
+            "artifact",
+            "unknown"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inventory": {
+          "enum": [
+            "git",
+            "walk"
+          ]
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "reason"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "size",
+              "sha256",
+              "archive"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "size": {
+                "type": "integer"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "archive": {
+                "enum": [
+                  "zip",
+                  "tar",
+                  null
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "outcome": {
+      "enum": [
+        "completed",
+        "incomplete",
+        "error"
+      ]
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enforced",
+        "fail_on",
+        "min_confidence",
+        "blocking",
+        "verdict"
+      ],
+      "properties": {
+        "enforced": {
+          "type": "boolean"
+        },
+        "fail_on": {
+          "enum": [
+            "info",
+            "low",
+            "medium",
+            "high",
+            "critical",
+            null
+          ]
+        },
+        "min_confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            null
+          ]
+        },
+        "blocking": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "fail",
+            "not_evaluated"
+          ]
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "findings",
+        "suppressed",
+        "by_severity",
+        "by_category"
+      ],
+      "properties": {
+        "findings": {
+          "type": "integer"
+        },
+        "suppressed": {
+          "type": "integer"
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "suppressed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "fingerprint",
+          "rule_id",
+          "location",
+          "severity",
+          "source",
+          "reason"
+        ],
+        "properties": {
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "rule_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9][a-z0-9-]*)+$"
+          },
+          "location": {
+            "$ref": "#/$defs/location"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "source": {
+            "enum": [
+              "inline",
+              "policy"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "analyzers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "origin",
+          "status",
+          "findings"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "skipped",
+              "disabled",
+              "failed"
+            ]
+          },
+          "findings": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/error"
+      }
+    },
+    "policy": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "policy_id",
+        "sha256",
+        "default"
+      ]
+    },
+    "linkage": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "operation_id",
+        "capability_id",
+        "system"
+      ],
+      "properties": {
+        "operation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parent_operation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "project_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "capability_id": {
+          "type": "string"
+        },
+        "system": {
+          "const": "blux"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "completed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "errors": {
+            "maxItems": 0
+          },
+          "gate": {
+            "properties": {
+              "verdict": {
+                "enum": [
+                  "pass",
+                  "fail"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "incomplete",
+              "error"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "errors": {
+            "minItems": 1
+          },
+          "gate": {
+            "properties": {
+              "verdict": {
+                "const": "not_evaluated"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

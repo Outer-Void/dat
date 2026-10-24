@@ -1,0 +1,351 @@
+# DAT capabilities for BLUX (docs/BLUX.md). Every capability is deterministic and read-only.
+# A failed gate is a successful audit (verdict: fail). DAT failing to audit is a BLUX FAILURE.
+contract: blux.capability-set
+contract_version: "1.0"
+capabilities:
+  - contract: blux.capability
+    contract_version: "1.0"
+    capability_id: repo.audit
+    version: 4.0.0
+    summary: "Full repository audit: security, quality, packaging and release findings."
+    contract_versions: ["1.0"]
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [target]
+      properties:
+        target: {type: string, minLength: 1, maxLength: 4096, description: "Path to audit (relative to the caller's working directory)."}
+        policy: {type: string, minLength: 1, maxLength: 4096, description: "dat.policy JSON file."}
+        use_target_policy: {type: boolean, description: "Load TARGET/.dat/policy.json when no policy is given (default true)."}
+        fail_on: {enum: ["info", "low", "medium", "high", "critical"]}
+        min_confidence: {enum: ["low", "medium", "high"]}
+    output_schema:
+      type: object
+      required: [contract, version, tool, capability, target, outcome, gate, summary, findings, suppressed, analyzers, errors, linkage]
+      properties:
+        contract: {const: dat.report}
+        version: {const: 1}
+        outcome: {const: completed}
+        gate:
+          type: object
+          required: [verdict, blocking, fail_on, min_confidence]
+          properties:
+            verdict: {enum: [pass, fail]}
+            blocking: {type: integer, minimum: 0}
+        findings:
+          type: array
+          items:
+            type: object
+            required: [rule_id, category, severity, confidence, message, location, fingerprint]
+            properties:
+              severity: {enum: ["info", "low", "medium", "high", "critical"]}
+              confidence: {enum: ["low", "medium", "high"]}
+              fingerprint: {type: string, pattern: "^[0-9a-f]{64}$"}
+        errors: {type: array, maxItems: 0}
+        linkage:
+          type: object
+          required: [operation_id, capability_id, system]
+    side_effects: read
+    required_permissions: ["fs:read:target"]
+    idempotent: true
+    timeout_ms: 600000
+    provider:
+      repository: Outer-Void/dat
+      kind: subprocess
+      entrypoint: dat blux-capability repo.audit
+    labels:
+      authority: deterministic
+  - contract: blux.capability
+    contract_version: "1.0"
+    capability_id: repo.security
+    version: 4.0.0
+    summary: "Repository security findings: secrets, risky code, Android, container and package security."
+    contract_versions: ["1.0"]
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [target]
+      properties:
+        target: {type: string, minLength: 1, maxLength: 4096, description: "Path to audit (relative to the caller's working directory)."}
+        policy: {type: string, minLength: 1, maxLength: 4096, description: "dat.policy JSON file."}
+        use_target_policy: {type: boolean, description: "Load TARGET/.dat/policy.json when no policy is given (default true)."}
+        fail_on: {enum: ["info", "low", "medium", "high", "critical"]}
+        min_confidence: {enum: ["low", "medium", "high"]}
+    output_schema:
+      type: object
+      required: [contract, version, tool, capability, target, outcome, gate, summary, findings, suppressed, analyzers, errors, linkage]
+      properties:
+        contract: {const: dat.report}
+        version: {const: 1}
+        outcome: {const: completed}
+        gate:
+          type: object
+          required: [verdict, blocking, fail_on, min_confidence]
+          properties:
+            verdict: {enum: [pass, fail]}
+            blocking: {type: integer, minimum: 0}
+        findings:
+          type: array
+          items:
+            type: object
+            required: [rule_id, category, severity, confidence, message, location, fingerprint]
+            properties:
+              severity: {enum: ["info", "low", "medium", "high", "critical"]}
+              confidence: {enum: ["low", "medium", "high"]}
+              fingerprint: {type: string, pattern: "^[0-9a-f]{64}$"}
+        errors: {type: array, maxItems: 0}
+        linkage:
+          type: object
+          required: [operation_id, capability_id, system]
+    side_effects: read
+    required_permissions: ["fs:read:target"]
+    idempotent: true
+    timeout_ms: 600000
+    provider:
+      repository: Outer-Void/dat
+      kind: subprocess
+      entrypoint: dat blux-capability repo.security
+    labels:
+      authority: deterministic
+  - contract: blux.capability
+    contract_version: "1.0"
+    capability_id: repo.quality
+    version: 4.0.0
+    summary: "Repository quality findings: conflicts, Python syntax and hygiene, work markers."
+    contract_versions: ["1.0"]
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [target]
+      properties:
+        target: {type: string, minLength: 1, maxLength: 4096, description: "Path to audit (relative to the caller's working directory)."}
+        policy: {type: string, minLength: 1, maxLength: 4096, description: "dat.policy JSON file."}
+        use_target_policy: {type: boolean, description: "Load TARGET/.dat/policy.json when no policy is given (default true)."}
+        fail_on: {enum: ["info", "low", "medium", "high", "critical"]}
+        min_confidence: {enum: ["low", "medium", "high"]}
+    output_schema:
+      type: object
+      required: [contract, version, tool, capability, target, outcome, gate, summary, findings, suppressed, analyzers, errors, linkage]
+      properties:
+        contract: {const: dat.report}
+        version: {const: 1}
+        outcome: {const: completed}
+        gate:
+          type: object
+          required: [verdict, blocking, fail_on, min_confidence]
+          properties:
+            verdict: {enum: [pass, fail]}
+            blocking: {type: integer, minimum: 0}
+        findings:
+          type: array
+          items:
+            type: object
+            required: [rule_id, category, severity, confidence, message, location, fingerprint]
+            properties:
+              severity: {enum: ["info", "low", "medium", "high", "critical"]}
+              confidence: {enum: ["low", "medium", "high"]}
+              fingerprint: {type: string, pattern: "^[0-9a-f]{64}$"}
+        errors: {type: array, maxItems: 0}
+        linkage:
+          type: object
+          required: [operation_id, capability_id, system]
+    side_effects: read
+    required_permissions: ["fs:read:target"]
+    idempotent: true
+    timeout_ms: 600000
+    provider:
+      repository: Outer-Void/dat
+      kind: subprocess
+      entrypoint: dat blux-capability repo.quality
+    labels:
+      authority: deterministic
+  - contract: blux.capability
+    contract_version: "1.0"
+    capability_id: repo.release
+    version: 4.0.0
+    summary: "Release-readiness gate: license/readme/changelog, version consistency, git state, secrets, conflicts."
+    contract_versions: ["1.0"]
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [target]
+      properties:
+        target: {type: string, minLength: 1, maxLength: 4096, description: "Path to audit (relative to the caller's working directory)."}
+        policy: {type: string, minLength: 1, maxLength: 4096, description: "dat.policy JSON file."}
+        use_target_policy: {type: boolean, description: "Load TARGET/.dat/policy.json when no policy is given (default true)."}
+        fail_on: {enum: ["info", "low", "medium", "high", "critical"]}
+        min_confidence: {enum: ["low", "medium", "high"]}
+    output_schema:
+      type: object
+      required: [contract, version, tool, capability, target, outcome, gate, summary, findings, suppressed, analyzers, errors, linkage]
+      properties:
+        contract: {const: dat.report}
+        version: {const: 1}
+        outcome: {const: completed}
+        gate:
+          type: object
+          required: [verdict, blocking, fail_on, min_confidence]
+          properties:
+            verdict: {enum: [pass, fail]}
+            blocking: {type: integer, minimum: 0}
+        findings:
+          type: array
+          items:
+            type: object
+            required: [rule_id, category, severity, confidence, message, location, fingerprint]
+            properties:
+              severity: {enum: ["info", "low", "medium", "high", "critical"]}
+              confidence: {enum: ["low", "medium", "high"]}
+              fingerprint: {type: string, pattern: "^[0-9a-f]{64}$"}
+        errors: {type: array, maxItems: 0}
+        linkage:
+          type: object
+          required: [operation_id, capability_id, system]
+    side_effects: read
+    required_permissions: ["fs:read:target"]
+    idempotent: true
+    timeout_ms: 600000
+    provider:
+      repository: Outer-Void/dat
+      kind: subprocess
+      entrypoint: dat blux-capability repo.release
+    labels:
+      authority: deterministic
+  - contract: blux.capability
+    contract_version: "1.0"
+    capability_id: package.audit
+    version: 4.0.0
+    summary: "Package manifests: pyproject/requirements/package.json metadata, pinning, lockfiles, install scripts."
+    contract_versions: ["1.0"]
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [target]
+      properties:
+        target: {type: string, minLength: 1, maxLength: 4096, description: "Path to audit (relative to the caller's working directory)."}
+        policy: {type: string, minLength: 1, maxLength: 4096, description: "dat.policy JSON file."}
+        use_target_policy: {type: boolean, description: "Load TARGET/.dat/policy.json when no policy is given (default true)."}
+        fail_on: {enum: ["info", "low", "medium", "high", "critical"]}
+        min_confidence: {enum: ["low", "medium", "high"]}
+    output_schema:
+      type: object
+      required: [contract, version, tool, capability, target, outcome, gate, summary, findings, suppressed, analyzers, errors, linkage]
+      properties:
+        contract: {const: dat.report}
+        version: {const: 1}
+        outcome: {const: completed}
+        gate:
+          type: object
+          required: [verdict, blocking, fail_on, min_confidence]
+          properties:
+            verdict: {enum: [pass, fail]}
+            blocking: {type: integer, minimum: 0}
+        findings:
+          type: array
+          items:
+            type: object
+            required: [rule_id, category, severity, confidence, message, location, fingerprint]
+            properties:
+              severity: {enum: ["info", "low", "medium", "high", "critical"]}
+              confidence: {enum: ["low", "medium", "high"]}
+              fingerprint: {type: string, pattern: "^[0-9a-f]{64}$"}
+        errors: {type: array, maxItems: 0}
+        linkage:
+          type: object
+          required: [operation_id, capability_id, system]
+    side_effects: read
+    required_permissions: ["fs:read:target"]
+    idempotent: true
+    timeout_ms: 300000
+    provider:
+      repository: Outer-Void/dat
+      kind: subprocess
+      entrypoint: dat blux-capability package.audit
+    labels:
+      authority: deterministic
+  - contract: blux.capability
+    contract_version: "1.0"
+    capability_id: artifact.audit
+    version: 4.0.0
+    summary: "Built artifacts: archive safety, wheel RECORD and checksum integrity, embedded secrets."
+    contract_versions: ["1.0"]
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [target]
+      properties:
+        target: {type: string, minLength: 1, maxLength: 4096, description: "Path to audit (relative to the caller's working directory)."}
+        policy: {type: string, minLength: 1, maxLength: 4096, description: "dat.policy JSON file."}
+        use_target_policy: {type: boolean, description: "Load TARGET/.dat/policy.json when no policy is given (default true)."}
+        fail_on: {enum: ["info", "low", "medium", "high", "critical"]}
+        min_confidence: {enum: ["low", "medium", "high"]}
+    output_schema:
+      type: object
+      required: [contract, version, tool, capability, target, outcome, gate, summary, findings, suppressed, analyzers, errors, linkage]
+      properties:
+        contract: {const: dat.report}
+        version: {const: 1}
+        outcome: {const: completed}
+        gate:
+          type: object
+          required: [verdict, blocking, fail_on, min_confidence]
+          properties:
+            verdict: {enum: [pass, fail]}
+            blocking: {type: integer, minimum: 0}
+        findings:
+          type: array
+          items:
+            type: object
+            required: [rule_id, category, severity, confidence, message, location, fingerprint]
+            properties:
+              severity: {enum: ["info", "low", "medium", "high", "critical"]}
+              confidence: {enum: ["low", "medium", "high"]}
+              fingerprint: {type: string, pattern: "^[0-9a-f]{64}$"}
+        errors: {type: array, maxItems: 0}
+        linkage:
+          type: object
+          required: [operation_id, capability_id, system]
+    side_effects: read
+    required_permissions: ["fs:read:target"]
+    idempotent: true
+    timeout_ms: 600000
+    provider:
+      repository: Outer-Void/dat
+      kind: subprocess
+      entrypoint: dat blux-capability artifact.audit
+    labels:
+      authority: deterministic
+  - contract: blux.capability
+    contract_version: "1.0"
+    capability_id: policy.verify
+    version: 4.0.0
+    summary: "Validate a DAT policy and optionally re-evaluate a report's release gate against it."
+    contract_versions: ["1.0"]
+    input_schema:
+      type: object
+      additionalProperties: false
+      required: [policy]
+      properties:
+        policy: {type: string, minLength: 1, maxLength: 4096, description: "dat.policy JSON file to validate."}
+        report: {type: string, minLength: 1, maxLength: 4096, description: "Optional dat.report JSON to re-gate."}
+    output_schema:
+      type: object
+      required: [contract, version, outcome, verdict, policy, report, errors, linkage]
+      properties:
+        contract: {const: dat.policy-verification}
+        version: {const: 1}
+        outcome: {const: completed}
+        verdict: {enum: [pass, fail, not_evaluated]}
+        policy:
+          type: object
+          required: [valid, problems]
+    side_effects: read
+    required_permissions: ["fs:read:target"]
+    idempotent: true
+    timeout_ms: 60000
+    provider:
+      repository: Outer-Void/dat
+      kind: subprocess
+      entrypoint: dat blux-capability policy.verify
+    labels:
+      authority: deterministic
