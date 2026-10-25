@@ -9,7 +9,7 @@ description = "DAT: deterministic quality, security and release audits (standalo
 readme = "README.md"
 authors = [{ name = "Outer Void", email = "outervoid.blux@gmail.com" }]
 # Licence unchanged from the existing LICENSE file; any change is an owner decision (credits UNR-008).
-license = "MIT"
+license = "LicenseRef-OuterVoid-Proprietary"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 # No runtime dependencies: DAT must work offline, without BLUX, CogA, cA or any AI service.

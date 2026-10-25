@@ -3,6 +3,13 @@
 All notable changes to DAT (Developer's Audit Tool) are documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+- **License.** The Outer-Void Proprietary License applies from 2026-10-25
+  (Copyright (c) 2026 Outer-Void / Justadudeinspace (JADIS); contact outervoid.blux@gmail.com, fallback
+  theoutervoid@outlook.com). Package metadata declares the matching `LicenseRef`. Copies and releases
+  obtained before that date keep the MIT License.
+
 ## [4.0.0] - Unreleased (Stage 03)
 
 Production rebuild as the ecosystem's deterministic quality, security and release authority. The audit of

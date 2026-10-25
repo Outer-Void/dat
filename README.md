@@ -76,7 +76,11 @@ make ci        # ruff, mypy --strict, pytest, wheel check, self-audit
 
 What changed from 3.x and why: [CHANGELOG.md](CHANGELOG.md) and [docs/AUDIT-3.0.md](docs/AUDIT-3.0.md).
 
-## Licence
+## License
 
-MIT, see [LICENSE](LICENSE). The licence is unchanged by this rebuild; any change is an owner decision
-tracked in the Outer Void credits ledger (UNR-008).
+**Outer-Void Proprietary License** (proprietary). Copyright (c) 2026 Outer-Void / Justadudeinspace (JADIS). All rights reserved. See [LICENSE](LICENSE).
+
+Copies and releases obtained before 2026-10-25 remain available under the MIT License they were
+published with; every change and release from that date on is proprietary.
+
+Contact: outervoid.blux@gmail.com (main) · theoutervoid@outlook.com (fallback)
