@@ -11,7 +11,7 @@ access and no telemetry. It runs on its own; BLUX, CogA and cA are optional cons
 **Author:** Outer Void Team, Justadudeinspace · **Contact:** `outervoid.blux@gmail.com`
 
 ```sh
-pip install "outervoid-dat @ git+https://github.com/Outer-Void/dat.git@v4.0.0"   # Python 3.11+, no dependencies
+pip install "outervoid-dat @ git+https://github.com/Outer-Void/dat.git"   # Python 3.11+, no dependencies; version 4.0.0 (no v4.0.0 tag yet)
 dat audit .                         # human report
 dat release . --gate                # release gate (exit 1 on blocking findings)
 dat security . --format json        # exactly one JSON document on stdout
