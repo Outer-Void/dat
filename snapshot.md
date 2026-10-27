@@ -1,3 +1,9 @@
+> **Historical snapshot (2026-01-21, commit `f735057`).** This file records the repository as it was then and is
+> kept as history; it is not current documentation. Since then DAT was relicensed (see [LICENSE](LICENSE),
+> Outer-Void Proprietary License), and descriptions such as "enterprise-grade" and the MIT licence statement
+> below are superseded. Links inside it point to files as they existed at that commit. Current documentation:
+> [README.md](README.md).
+
 # Repository Snapshot
 
 ## 1) Metadata
