@@ -248,3 +248,14 @@ def test_policy_schema_agrees_with_validator() -> None:
     }
     assert validate(good) == [] and schema.is_valid(good)
     assert validate(DEFAULT_POLICY.source or {"contract": "dat.policy", "version": 1}) == []
+
+
+def test_a_policy_nested_too_deeply_is_invalid_not_an_internal_error(tmp_path: Path) -> None:
+    """OV-51: on 487e1d4 this raised RecursionError, reported as INTERNAL_ERROR."""
+    from dat.policy import read_document
+
+    policy = tmp_path / "policy.json"
+    policy.write_text("[" * 100_000)
+    with pytest.raises(DatError) as info:
+        read_document(policy)
+    assert info.value.code is ErrorCode.INVALID_POLICY

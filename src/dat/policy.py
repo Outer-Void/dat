@@ -215,6 +215,8 @@ def read_document(path: Path) -> Any:
         return json.loads(raw, object_pairs_hook=_no_duplicates)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise DatError(ErrorCode.INVALID_POLICY, "Policy is not valid JSON.", details={"error": str(exc)}) from None
+    except RecursionError:
+        raise DatError(ErrorCode.INVALID_POLICY, "Policy is nested too deeply to parse.") from None
     except ValueError as exc:
         raise DatError(ErrorCode.INVALID_POLICY, str(exc)) from None
 

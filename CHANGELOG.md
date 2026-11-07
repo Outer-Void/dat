@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+- **Fixed (OV-51).** A policy file nested too deeply to parse (for example 100,000 `[`) stopped DAT with
+  `INTERNAL_ERROR: RecursionError`; it is now `INVALID_POLICY` (still exit 3, nothing judged).
+
 - **License.** The Outer-Void Proprietary License applies from 2026-10-25
   (Copyright (c) 2026 Outer-Void / Justadudeinspace (JADIS); contact outervoid.blux@gmail.com, fallback
   theoutervoid@outlook.com). Package metadata declares the matching `LicenseRef`. Copies and releases
