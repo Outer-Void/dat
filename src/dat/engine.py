@@ -192,6 +192,19 @@ def run(
                 }
             )
 
+    # OV-62 (F134): a file or directory DAT could not read was not audited, so the gate cannot speak for it.
+    # The audit is incomplete (exit 3) instead of passing over it. Size limits, symlinks and special files are
+    # documented exclusions and stay plain skips.
+    unread = [s.rel for s in inv.skipped_sorted() if s.reason.startswith(("unreadable", "unreadable_directory"))]
+    if unread:
+        errors.append(
+            DatError(
+                ErrorCode.TARGET_UNREADABLE,
+                f"{len(unread)} path(s) in the target could not be read, so the audit does not cover them.",
+                details={"paths": unread[:50], "count": len(unread)},
+            ).to_dict()
+        )
+
     target_doc: dict[str, Any] = {
         "kind": profile.target_kind,
         "path": label,

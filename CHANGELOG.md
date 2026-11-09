@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+- **Fixed (OV-62, F134).** A file DAT could not read (permissions) was only listed in `target.skipped`, so a
+  secret in it went unseen and an enforced gate passed with exit 0. An unreadable file or directory now makes
+  the audit `incomplete` with a `TARGET_UNREADABLE` error naming the paths (exit 3), as the exit-code table
+  already promised for an unreadable target. Files over the policy's size limit, symlinks and special files stay
+  plain, documented skips.
 - **Fixed (OV-51).** A policy file nested too deeply to parse (for example 100,000 `[`) stopped DAT with
   `INTERNAL_ERROR: RecursionError`; it is now `INVALID_POLICY` (still exit 3, nothing judged).
 

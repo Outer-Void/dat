@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import AWS_KEY, STRONG_VALUE, audit, fake, rules, write
+from tests.conftest import AWS_KEY, STRIPE_KEY, STRONG_VALUE, audit, fake, rules, write
 
 CASES: list[tuple[str, dict[str, str], set[str], set[str]]] = [
     # (id, files, rules that must appear, rules that must not appear)
@@ -170,3 +170,44 @@ def test_3_0_circular_import_is_gone() -> None:
     for mod in modules:
         proc = subprocess.run([sys.executable, "-c", f"import {mod}"], capture_output=True, text=True)
         assert proc.returncode == 0, f"{mod}: {proc.stderr}"
+
+
+def _unreadable(path: Path) -> bool:
+    path.chmod(0)
+    try:
+        path.read_bytes()
+    except OSError:
+        return True
+    path.chmod(0o644)
+    return False
+
+
+def test_ov62_an_unreadable_file_makes_the_audit_incomplete(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """OV-62 (F134): DAT recorded an unreadable file only in target.skipped, so a secret in it went unseen and an
+    enforced gate passed (exit 0). Now the audit is incomplete (exit 3) and names the path."""
+    from tests.conftest import cli_json
+
+    write(tmp_path, {"README.md": "# x\n", "leak.py": f'api_key = "{STRIPE_KEY}"\n'})
+    secret = tmp_path / "leak.py"
+    if not _unreadable(secret):
+        pytest.skip("this environment can read a mode-000 file (root)")
+    try:
+        code, report = cli_json(["audit", str(tmp_path), "--gate", "--fail-on", "critical", "--format", "json"], capsys)
+    finally:
+        secret.chmod(0o644)
+    assert code == 3
+    assert report["outcome"] == "incomplete" and report["gate"]["verdict"] == "not_evaluated"
+    assert report["errors"][0]["code"] == "TARGET_UNREADABLE"
+    assert report["errors"][0]["details"]["paths"] == ["leak.py"]
+
+
+def test_ov62_size_limits_stay_plain_skips(tmp_path: Path) -> None:
+    """A file over the policy's documented size limit is a recorded exclusion, not an unreadable target."""
+    import dataclasses
+
+    from dat.policy import DEFAULT_POLICY
+
+    write(tmp_path, {"big.txt": "x" * 4096})
+    report = audit(tmp_path, policy=dataclasses.replace(DEFAULT_POLICY, max_file_bytes=1024))
+    assert report["outcome"] == "completed" and report["errors"] == []
+    assert {"path": "big.txt", "reason": "too_large"} in report["target"]["skipped"]

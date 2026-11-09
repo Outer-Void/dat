@@ -57,7 +57,7 @@ not gitignored). Otherwise it walks the directory. It never follows symlinks and
 | `0` | Audit completed. Gate passed, or not enforced. Findings may exist. |
 | `1` | Audit completed and the enforced gate failed (blocking findings). |
 | `2` | Usage error (bad flags). |
-| `3` | DAT could not complete the audit: missing/unreadable target, invalid policy, analyzer or plugin failure, limit exceeded, output or signing failure. |
+| `3` | DAT could not complete the audit: missing/unreadable target (including any file or directory inside it that could not be read, `TARGET_UNREADABLE`), invalid policy, analyzer or plugin failure, limit exceeded, output or signing failure. |
 
 Exit `3` always wins over `1`: an incomplete audit is never reported as a gate result. In JSON the same
 distinction is `outcome` (`completed` / `incomplete` / `error`) and `gate.verdict`.
