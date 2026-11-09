@@ -11,7 +11,7 @@ access and no telemetry. It runs on its own; BLUX, CogA and cA are optional cons
 **Author:** Outer Void Team, Justadudeinspace · **Contact:** `outervoid.blux@gmail.com`
 
 ```sh
-pip install "outervoid-dat @ git+https://github.com/Outer-Void/dat.git"   # Python 3.11+, no dependencies; version 4.0.0 (no v4.0.0 tag yet)
+pip install "outervoid-dat @ git+https://github.com/Outer-Void/dat.git"   # Python 3.11+, no dependencies; version 4.0.0 (not released; see Releases)
 dat audit .                         # human report
 dat release . --gate                # release gate (exit 1 on blocking findings)
 dat security . --format json        # exactly one JSON document on stdout
@@ -66,6 +66,21 @@ suppressions, ignore paths and limits ([docs/POLICY.md](docs/POLICY.md)). `.dati
   BLUX System and linked to the operation ([docs/BLUX.md](docs/BLUX.md)).
 - **lrc:** `dat audit --report BUILD_DIR` and `dat --from-lrc DIR` keep working ([docs/USAGE.md](docs/USAGE.md#legacy-invocations-pre-40)).
 - **CI:** `dat release . --gate --sarif dat.sarif`; see `.github/workflows/ci.yml`, which gates DAT on itself.
+
+## Releases
+
+DAT has no release yet: CI cannot run (GitHub Actions billing lock), and the release policy needs green CI on the
+release commit. Release builds are made, checked and signed offline with the shared release tool in
+[Outer-Void/docs](https://github.com/Outer-Void/docs) (`tools/release_pipeline.py`):
+- two fresh clones must build byte-identical wheels and sdists;
+- the test suite, an install of each artifact into an empty environment, and scanners other than DAT (bandit,
+  detect-secrets, pip-audit) must pass. DAT's verdict on itself is recorded but never counted;
+- `SHA256SUMS` and a release receipt are signed with the Outer-Void release key (Ed25519, SSH signature format,
+  namespace `outer-void-release`; public key in `releases/allowed_signers` of that repository).
+
+Check a build yourself with `python3 tools/release_pipeline.py verify --release releases/dat/<version>
+--artifacts <dir> [--rebuild <dat checkout>]`. The tag workflow (`.github/workflows/release.yml`) only runs that
+check; it never signs or publishes.
 
 ## Development
 

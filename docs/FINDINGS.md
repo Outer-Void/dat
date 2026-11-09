@@ -87,7 +87,7 @@ demo-looking value or one in documentation is `low`), not from judgment at run t
 | `js.unpinned-dependency` | javascript | package | medium | high | Unpinned dependency |
 | `js.missing-lockfile` | javascript | package | medium | high | Dependencies without a lockfile |
 | `js.dynamic-code` | javascript | security | medium | low | eval / new Function |
-| `android.manifest-unparseable` | android | quality | medium | high | AndroidManifest.xml not parsed |
+| `android.manifest-unparseable` | android | security | high | high | AndroidManifest.xml not parsed (an unread manifest could hide the flags below) |
 | `android.debuggable` | android | security | high | high | android:debuggable=true |
 | `android.allow-backup` | android | security | low | high | android:allowBackup=true |
 | `android.cleartext-traffic` | android | security | medium | high | Cleartext HTTP allowed |

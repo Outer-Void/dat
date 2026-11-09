@@ -211,3 +211,42 @@ def test_ov62_size_limits_stay_plain_skips(tmp_path: Path) -> None:
     report = audit(tmp_path, policy=dataclasses.replace(DEFAULT_POLICY, max_file_bytes=1024))
     assert report["outcome"] == "completed" and report["errors"] == []
     assert {"path": "big.txt", "reason": "too_large"} in report["target"]["skipped"]
+
+
+DEBUGGABLE = (
+    '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+    '<application android:debuggable="true"/></manifest>\n'
+)
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        '<!DOCTYPE m SYSTEM "file:///etc/passwd">\n',  # one harmless-looking line
+        '<!DOCTYPE m [<!ENTITY a "aaaa">]>\n',  # entity declarations
+        "<!doctype m>\n",  # not even valid XML
+    ],
+)
+def test_ov63_a_manifest_dat_cannot_parse_fails_the_security_gate(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], prefix: str
+) -> None:
+    """OV-63 (F139): `android.manifest-unparseable` was quality/medium, which the security profile drops. Adding a
+    DOCTYPE line to a debuggable manifest made `dat security --gate` pass (exit 0) with no finding at all."""
+    from tests.conftest import cli_json
+
+    write(tmp_path, {"app/AndroidManifest.xml": '<?xml version="1.0"?>\n' + prefix + DEBUGGABLE})
+    code, report = cli_json(["security", str(tmp_path), "--gate", "--format", "json"], capsys)
+    assert code == 1
+    assert report["gate"]["verdict"] == "fail"
+    found = [(f["rule_id"], f["category"], f["severity"]) for f in report["findings"]]
+    assert ("android.manifest-unparseable", "security", "high") in found
+
+
+def test_ov63_the_same_manifest_without_a_doctype_still_reports_its_flags(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.conftest import cli_json
+
+    write(tmp_path, {"app/AndroidManifest.xml": DEBUGGABLE})
+    code, report = cli_json(["security", str(tmp_path), "--gate", "--format", "json"], capsys)
+    assert code == 1 and [f["rule_id"] for f in report["findings"]] == ["android.debuggable"]

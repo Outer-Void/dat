@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+- **Fixed (OV-63, F139).** `android.manifest-unparseable` was a quality finding (medium), which `dat security`
+  drops, so one `<!DOCTYPE …>` line in front of a debuggable manifest made `dat security --gate` pass with no
+  finding. DAT still refuses DTDs, but an unparsed manifest is now a high security finding: it could hide every
+  flag DAT checks.
+- **Changed (OV-63, F140).** The tag workflow no longer builds and publishes a release. It built, gated DAT only
+  with DAT's own audit, signed only if a GPG secret existed (none does) and then published. Releases are now
+  built, checked independently and signed offline with the shared release tool (owner decision 2026-11-09); the
+  workflow reruns the tests and checks a rebuild against the signed record.
 - **Fixed (OV-62, F134).** A file DAT could not read (permissions) was only listed in `target.skipped`, so a
   secret in it went unseen and an enforced gate passed with exit 0. An unreadable file or directory now makes
   the audit `incomplete` with a `TARGET_UNREADABLE` error naming the paths (exit 3), as the exit-code table

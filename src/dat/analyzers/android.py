@@ -14,7 +14,7 @@ from dat.analyzers.base import Analyzer, Rule, RunOptions
 from dat.inventory import Inventory
 from dat.model import Category, Confidence, Finding, Severity
 
-S, Q = Category.SECURITY, Category.QUALITY
+S = Category.SECURITY
 NS = "{http://schemas.android.com/apk/res/android}"
 COMPONENTS = ("activity", "activity-alias", "service", "receiver", "provider")
 GRADLE_SECRET = re.compile(r"""\b(storePassword|keyPassword)\b\s*(?:=\s*|\(\s*|\s+)(["'])([^"'$]{1,128})\2""")
@@ -24,7 +24,16 @@ class AndroidAnalyzer(Analyzer):
     id = "android"
     version = "1.0.0"
     rules = (
-        Rule("android.manifest-unparseable", Q, Severity.MEDIUM, Confidence.HIGH, "AndroidManifest.xml not parsed"),
+        # OV-63 (F139): an unparsed manifest hides every flag below, so it is a security finding that blocks the
+        # default gate. It was quality/medium, and one DOCTYPE line let `dat security --gate` pass a debuggable app.
+        Rule(
+            "android.manifest-unparseable",
+            S,
+            Severity.HIGH,
+            Confidence.HIGH,
+            "AndroidManifest.xml not parsed",
+            "Remove the DTD or fix the XML: a manifest DAT cannot read could hide debuggable or exported flags.",
+        ),
         Rule(
             "android.debuggable",
             S,
